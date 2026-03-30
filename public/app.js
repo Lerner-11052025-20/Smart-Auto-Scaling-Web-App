@@ -52,16 +52,15 @@ async function boot() {
   await sleep(1200);
   el('skeletonGrid').style.display = 'none';
   show('kpiRow'); show('chartsRow'); show('bottomRow');
-  
+
   // Wait for browser layout to repaint so clientWidth metrics are non-zero!
   await sleep(150);
 
-  try { initThreeJS(); } catch(e) { console.error(e); }
-  try { initCpuChart(); } catch(e) { console.error(e); }
-  try { initReqChart(); } catch(e) { console.error(e); }
-  try { initGauge(); } catch(e) { console.error(e); }
-  try { initInstanceChart(); } catch(e) { console.error(e); }
-  try { initSparklines(); } catch(e) { console.error(e); }
+  try { initCpuChart(); } catch (e) { console.error(e); }
+  try { initReqChart(); } catch (e) { console.error(e); }
+  try { initGauge(); } catch (e) { console.error(e); }
+  try { initInstanceChart(); } catch (e) { console.error(e); }
+  try { initSparklines(); } catch (e) { console.error(e); }
 
   setupResizeObserver();
 }
@@ -73,14 +72,14 @@ function setupResizeObserver() {
     resizeTimer = setTimeout(() => {
       // Re-initialize 2D dynamic charts on global window resize
       if (S.view === 'dashboard') {
-         initCpuChart(); updateCpuChart();
-         initReqChart(); updateReqChart();
-         initGauge(); updateGauge(S.latest?.cpu?.load || 0);
-         initSparklines(); updateSparklines();
+        initCpuChart(); updateCpuChart();
+        initReqChart(); updateReqChart();
+        initGauge(); updateGauge(S.latest?.cpu?.load || 0);
+        initSparklines(); updateSparklines();
       } else if (S.view === 'analytics') {
-         renderMultiChart();
+        renderMultiChart();
       } else if (S.view === 'scaling') {
-         initInstanceChart(); updateInstanceChart(S.latest?.scaling?.instances || 1);
+        initInstanceChart(); updateInstanceChart(S.latest?.scaling?.instances || 1);
       }
     }, 280);
   });
@@ -122,7 +121,6 @@ function connectSocket() {
     updateCpuChart();
     updateReqChart();
     updateGauge(data.cpu.load);
-    updateSphere(data.cpu.load, data.scaling.instances);
     updateAIPanel(data);
     updateHealthBadge(data.system.status);
     updateUptime(data.system.uptime);
@@ -388,8 +386,12 @@ function initCpuChart() {
   lg.append('stop').attr('offset', '0%').attr('stop-color', C.indigo);
   lg.append('stop').attr('offset', '100%').attr('stop-color', C.cyan);
   const ag = defs.append('linearGradient').attr('id', 'cpuAG').attr('x1', '0').attr('x2', '0').attr('y1', '0').attr('y2', '1');
-  ag.append('stop').attr('offset', '0%').attr('stop-color', C.indigo).attr('stop-opacity', '0.3');
-  ag.append('stop').attr('offset', '100%').attr('stop-color', C.cyan).attr('stop-opacity', '0.01');
+  ag.append('stop').attr('offset', '0%').attr('stop-color', C.cyan).attr('stop-opacity', '0.4');
+  ag.append('stop').attr('offset', '100%').attr('stop-color', C.indigo).attr('stop-opacity', '0.0');
+
+  const glow = defs.append('filter').attr('id', 'cpuGlow').attr('x', '-20%').attr('y', '-20%').attr('width', '140%').attr('height', '140%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '5').attr('result', 'blur');
+  glow.append('feComposite').attr('in', 'SourceGraphic').attr('in2', 'blur').attr('operator', 'over');
 
   const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
   g.append('g').attr('id', 'cpuGridY').attr('class', 'd3-grid');
@@ -410,11 +412,15 @@ function initCpuChart() {
   g.append('path').attr('id', 'cpuArea').attr('fill', 'url(#cpuAG)');
   g.append('path').attr('id', 'predLine').attr('fill', 'none')
     .attr('stroke', C.warning).attr('stroke-width', '1.5').attr('stroke-dasharray', '5 4').attr('opacity', '0.7');
+  
   g.append('path').attr('id', 'cpuLine').attr('fill', 'none')
-    .attr('stroke', 'url(#cpuLG)').attr('stroke-width', '2.5').attr('stroke-linecap', 'round');
-  g.append('circle').attr('id', 'cpuDot').attr('r', '5')
-    .attr('fill', C.cyan).attr('stroke', '#0b1220').attr('stroke-width', '2.5')
-    .style('filter', 'drop-shadow(0 0 6px #22d3ee)');
+    .attr('stroke', 'url(#cpuLG)').attr('stroke-width', '3').attr('stroke-linecap', 'round')
+    .attr('filter', 'url(#cpuGlow)');
+    
+  g.append('circle').attr('id', 'cpuDot').attr('r', '6')
+    .attr('fill', '#fff').attr('stroke', C.cyan).attr('stroke-width', '2.5')
+    .attr('filter', 'url(#cpuGlow)');
+    
   g.append('g').attr('class', 'd3-axis').attr('id', 'cpuAxisX').attr('transform', `translate(0,${h})`);
   g.append('g').attr('class', 'd3-axis').attr('id', 'cpuAxisY');
 
@@ -502,38 +508,59 @@ function updateInstanceChart(inst) {
 function initReqChart() {
   const wrap = el('reqChart'); if (!wrap) return;
   wrap.innerHTML = '';
-  const m = { t: 10, r: 10, b: 28, l: 38 };
+  const m = { t: 15, r: 10, b: 25, l: 38 };
   const W = Math.max(wrap.clientWidth, 260), H = 180;
   const w = W - m.l - m.r, h = H - m.t - m.b;
   const svg = d3.select('#reqChart').append('svg').attr('width', W).attr('height', H);
   const defs = svg.append('defs');
-  const bg = defs.append('linearGradient').attr('id', 'barGrad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
-  bg.append('stop').attr('offset', '0%').attr('stop-color', C.indigo);
-  bg.append('stop').attr('offset', '100%').attr('stop-color', C.cyan);
+  
+  const areaGrad = defs.append('linearGradient').attr('id', 'reqAreaGrad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  areaGrad.append('stop').attr('offset', '0%').attr('stop-color', C.cyan).attr('stop-opacity', 0.5);
+  areaGrad.append('stop').attr('offset', '100%').attr('stop-color', C.cyan).attr('stop-opacity', 0.0);
+
+  const glow = defs.append('filter').attr('id', 'reqGlow').attr('x', '-20%').attr('y', '-20%').attr('width', '140%').attr('height', '140%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'blur');
+  glow.append('feComposite').attr('in', 'SourceGraphic').attr('in2', 'blur').attr('operator', 'over');
+
   const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
-  g.append('g').attr('class', 'd3-axis').attr('id', 'barAxisX').attr('transform', `translate(0,${h})`);
-  g.append('g').attr('class', 'd3-axis').attr('id', 'barAxisY');
-  g.append('g').attr('id', 'barGroup');
+  g.append('g').attr('class', 'req-grid-y');
+  
+  g.append('path').attr('id', 'reqArea').attr('fill', 'url(#reqAreaGrad)');
+  g.append('path').attr('id', 'reqLine').attr('fill', 'none').attr('stroke', C.cyan).attr('stroke-width', 3).attr('filter', 'url(#reqGlow)');
+  
+  g.append('g').attr('class', 'd3-axis').attr('id', 'reqAxisX').attr('transform', `translate(0,${h})`);
+  g.append('g').attr('class', 'd3-axis').attr('id', 'reqAxisY');
+  g.append('g').attr('id', 'reqDots');
+  
   Charts.req = { g, w, h };
 }
 
 function updateReqChart() {
   if (!Charts.req) return;
   const { g, w, h } = Charts.req;
-  const data = S.req.slice(-20).map((v, i) => ({ i, v }));
-  const x = d3.scaleBand().domain(data.map(d => d.i)).range([0, w]).padding(0.3);
-  const maxV = Math.max(d3.max(data, d => d.v) || 10, 10);
-  const y = d3.scaleLinear().domain([0, maxV]).range([h, 0]);
-  const bars = g.select('#barGroup').selectAll('rect').data(data, d => d.i);
-  bars.enter().append('rect').attr('x', d => x(d.i)).attr('y', h).attr('height', 0)
-    .attr('width', x.bandwidth()).attr('rx', 3).attr('fill', 'url(#barGrad)').attr('opacity', .72)
-    .merge(bars).transition().duration(320)
-    .attr('x', d => x(d.i)).attr('width', x.bandwidth())
-    .attr('y', d => y(d.v)).attr('height', d => h - y(d.v))
-    .attr('opacity', (_, i, ns) => i === ns.length - 1 ? 1 : 0.65);
-  bars.exit().remove();
-  g.select('#barAxisX').call(d3.axisBottom(x).tickFormat(() => ''));
-  g.select('#barAxisY').call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('d')));
+  const data = S.req.slice(-30).map((v, i) => ({ i, v }));
+  
+  const x = d3.scaleLinear().domain([0, Math.max(1, data.length - 1)]).range([0, w]);
+  const maxV = Math.max(d3.max(data, d => d.v) || 10);
+  const y = d3.scaleLinear().domain([0, maxV * 1.15]).range([h, 0]);
+  
+  const lineFunc = d3.line().x(d => x(d.i)).y(d => y(d.v)).curve(d3.curveMonotoneX);
+  const areaFunc = d3.area().x(d => x(d.i)).y0(h).y1(d => y(d.v)).curve(d3.curveMonotoneX);
+  
+  g.select('#reqLine').datum(data).transition().duration(400).ease(d3.easeLinear).attr('d', lineFunc);
+  g.select('#reqArea').datum(data).transition().duration(400).ease(d3.easeLinear).attr('d', areaFunc);
+  
+  const dots = g.select('#reqDots').selectAll('circle').data(data.slice(-1));
+  dots.enter().append('circle').attr('r', 5).attr('fill', '#fff').attr('stroke', C.cyan).attr('stroke-width', 2).attr('filter', 'url(#reqGlow)')
+      .merge(dots).transition().duration(400).ease(d3.easeLinear)
+      .attr('cx', d => x(d.i)).attr('cy', d => y(d.v));
+      
+  g.select('.req-grid-y').call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  g.select('.req-grid-y').select('.domain').remove();
+  
+  g.select('#reqAxisX').call(d3.axisBottom(x).ticks(6).tickFormat(d => `-${data.length - 1 - d}s`)).select('.domain').remove();
+  g.select('#reqAxisY').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d'))).select('.domain').remove();
+  
   if (S.latest) setText('totalReqBadge', `${S.latest.performance.requests} total`);
 }
 
@@ -543,112 +570,60 @@ function updateReqChart() {
 function initGauge() {
   const svg = d3.select('#gaugeRing');
   svg.html('');
-  const R = 76, cx = 95, cy = 95, tau = 2 * Math.PI, sAng = -tau * 0.375;
+  const R = 80, cx = 95, cy = 95, tau = 2 * Math.PI, sAng = -tau * 0.375;
   const defs = svg.append('defs');
-  const gg = defs.append('linearGradient').attr('id', 'gaugeGrad').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '1');
-  gg.append('stop').attr('offset', '0%').attr('stop-color', C.indigo);
-  gg.append('stop').attr('offset', '100%').attr('stop-color', C.cyan);
+  
+  const glow = defs.append('filter').attr('id', 'gaugeGlow').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '6').attr('result', 'blur');
+  glow.append('feComposite').attr('in', 'SourceGraphic').attr('in2', 'blur').attr('operator', 'over');
+
+  const ticksBg = svg.append('g').attr('transform', `translate(${cx},${cy})`);
+  const tickCount = 42;
+  const step = (tau * 0.75) / tickCount;
+  for (let i = 0; i < tickCount; i++) {
+    const a1 = sAng + i * step;
+    const a2 = sAng + (i + 0.6) * step;
+    ticksBg.append('path')
+      .datum({ s: a1, e: a2 })
+      .attr('d', d3.arc().innerRadius(R - 10).outerRadius(R).startAngle(d => d.s).endAngle(d => d.e))
+      .attr('fill', 'rgba(255,255,255,0.06)');
+  }
+
   svg.append('path')
     .datum({ s: sAng, e: sAng + tau * 0.75 })
-    .attr('d', d3.arc().innerRadius(R - 13).outerRadius(R).startAngle(d => d.s).endAngle(d => d.e))
-    .attr('fill', 'rgba(255,255,255,0.05)')
+    .attr('d', d3.arc().innerRadius(R - 20).outerRadius(R - 16).startAngle(d => d.s).endAngle(d => d.e).cornerRadius(2))
+    .attr('fill', 'rgba(255,255,255,0.04)')
     .attr('transform', `translate(${cx},${cy})`);
+
   svg.append('path').attr('id', 'gaugeFg').attr('transform', `translate(${cx},${cy})`);
+  svg.append('circle').attr('id', 'gaugeDot').attr('r', 6).attr('cx', cx).attr('cy', cy).attr('fill', '#fff').attr('filter', 'url(#gaugeGlow)');
+  
   Charts.gauge = { svg, cx, cy, R, tau, sAng };
 }
 
 function updateGauge(load) {
   if (!Charts.gauge) return;
-  const { tau, sAng } = Charts.gauge;
-  const col = load > 70 ? C.danger : load > 50 ? C.warning : C.success;
-  d3.select('#gaugeFg').datum({ s: sAng, e: sAng + tau * 0.75 * Math.min(load / 100, 1) })
-    .transition().duration(500).ease(d3.easeQuadOut)
-    .attr('d', d3.arc().innerRadius(73).outerRadius(76).startAngle(d => d.s).endAngle(d => d.e).cornerRadius(3))
-    .attr('fill', col).attr('filter', `drop-shadow(0 0 8px ${col}88)`);
+  const { tau, sAng, cx, cy, R } = Charts.gauge;
+  const col = load > 75 ? C.danger : load > 50 ? C.warning : C.cyan;
+  const pct = Math.min(Math.max(load / 100, 0), 1);
+  const endA = sAng + tau * 0.75 * pct;
+  
+  d3.select('#gaugeFg').datum({ s: sAng, e: endA })
+    .transition().duration(500).ease(d3.easeBounceOut)
+    .attr('d', d3.arc().innerRadius(R - 20).outerRadius(R - 16).startAngle(d => d.s).endAngle(d => d.e).cornerRadius(4))
+    .attr('fill', col).attr('filter', `drop-shadow(0 0 12px ${col}A0)`);
+    
+  d3.select('#gaugeDot').transition().duration(500).ease(d3.easeBounceOut)
+    .attr('cx', cx + Math.sin(endA) * (R - 18))
+    .attr('cy', cy - Math.cos(endA) * (R - 18))
+    .attr('fill', col);
+    
   setText('gaugeNum', Math.round(load));
   const gs = el('gaugeState');
-  if (gs) { gs.textContent = load > 70 ? 'CRITICAL' : load > 50 ? 'WARNING' : 'NORMAL'; gs.style.color = col; }
+  if (gs) { gs.textContent = load > 75 ? 'CRITICAL' : load > 50 ? 'WARNING' : 'NORMAL'; gs.style.color = col; }
 }
 
-// ─────────────────────────────────────────────────────────
-// THREE.JS — 3D SPHERE (reacts to CPU + instances)
-// ─────────────────────────────────────────────────────────
-function initThreeJS() {
-  const canvas = el('threeCanvas'), wrap = canvas?.parentElement;
-  if (!canvas || !wrap) return;
-  const W = wrap.clientWidth || 300, H = Math.max(wrap.clientHeight - 60, 180);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(W, H);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-  camera.position.set(0, 0, 3.8);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-  const dLight = new THREE.DirectionalLight(0xffffff, 0.9); dLight.position.set(4, 4, 4); scene.add(dLight);
-  const pL1 = new THREE.PointLight(0x6366f1, 3.5, 12); pL1.position.set(-2, 2, 2); scene.add(pL1);
-  const pL2 = new THREE.PointLight(0x22d3ee, 2.0, 10); pL2.position.set(2, -2, 1); scene.add(pL2);
-  const mat = new THREE.MeshPhongMaterial({ color: 0x22c55e, emissive: 0x053d1a, shininess: 100, transparent: true, opacity: 0.93 });
-  const sph = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 5), mat); scene.add(sph);
-  const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.03, 4), new THREE.MeshBasicMaterial({ color: 0x22c55e, wireframe: true, transparent: true, opacity: 0.10 })); scene.add(wire);
-  const r1 = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.012, 8, 72), new THREE.MeshBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.18 }));
-  const r2 = new THREE.Mesh(new THREE.TorusGeometry(1.80, 0.008, 8, 60), new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.12 }));
-  r1.rotation.x = Math.PI / 2; r2.rotation.x = 0.4; r2.rotation.y = 0.8; scene.add(r1); scene.add(r2);
-  const pGeo = new THREE.BufferGeometry(), pos = new Float32Array(450);
-  for (let i = 0; i < 450; i++) pos[i] = (Math.random() - 0.5) * 10;
-  pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const ptcl = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x6366f1, size: 0.025, transparent: true, opacity: 0.4 })); scene.add(ptcl);
-  window._three = { scene, camera, renderer, sphere: sph, wireShell: wire, ring1: r1, ring2: r2, particles: ptcl, pLight: pL1, pLight2: pL2 };
-  (function animate(ts) {
-    requestAnimationFrame(animate);
-    const t = ts * 0.001;
-    sph.rotation.y = t * 0.38; sph.rotation.x = Math.sin(t * 0.28) * 0.18;
-    wire.rotation.copy(sph.rotation);
-    r1.rotation.z = t * 0.75; r2.rotation.z = -t * 0.45; r2.rotation.x = 0.4 + Math.sin(t * 0.35) * 0.08;
-    ptcl.rotation.y = t * 0.04;
-    pL1.position.x = Math.sin(t * 0.7) * 3; pL1.position.y = Math.cos(t * 0.5) * 3;
-    pL2.position.x = -Math.sin(t * 0.6) * 2.5; pL2.position.y = -Math.cos(t * 0.4) * 2;
-    renderer.render(scene, camera);
-  })(0);
-  window.addEventListener('resize', () => {
-    const nW = wrap.clientWidth, nH = Math.max(wrap.clientHeight - 60, 160);
-    renderer.setSize(nW, nH); camera.aspect = nW / nH; camera.updateProjectionMatrix();
-  });
-}
 
-// Color: < 30 green · 30-70 yellow · > 70 red
-// Size: scales with instance count
-function updateSphere(load, instances = 1) {
-  const t = window._three; if (!t?.sphere) return;
-  let sc, se, pc, p2c;
-  if (load > 70) { sc = 0xef4444; se = 0x5a0000; pc = 0xef4444; p2c = 0xf97316; }
-  else if (load > 30) { sc = 0xf59e0b; se = 0x4d2d00; pc = 0xf59e0b; p2c = 0xfbbf24; }
-  else { sc = 0x22c55e; se = 0x053d1a; pc = 0x6366f1; p2c = 0x22d3ee; }
-  t.sphere.material.color.setHex(sc);
-  t.sphere.material.emissive.setHex(se);
-  t.wireShell.material.color.setHex(sc);
-  t.pLight.color.setHex(pc); t.pLight2.color.setHex(p2c);
-  t.pLight.intensity = 2 + (load / 100) * 5;
-  // Size reflects number of instances
-  const maxInst = S.scalingConfig.maxInstances || 5;
-  const instScale = 0.85 + (instances / maxInst) * 0.4;
-  const loadScale = 1 + (load / 100) * 0.15;
-  const total = instScale * loadScale;
-  t.sphere.scale.setScalar(total);
-  t.wireShell.scale.setScalar(total + 0.03);
-  // Ring speed reacts to instances
-  t.ring1.material.opacity = 0.10 + (instances / maxInst) * 0.25;
-  // Badge
-  const badge = el('loadBadge');
-  if (badge) {
-    badge.className = 'load-badge';
-    if (load > 70) { badge.textContent = 'HIGH'; badge.classList.add('hi'); }
-    else if (load > 30) { badge.textContent = 'MEDIUM'; badge.classList.add('med'); }
-    else { badge.textContent = 'LOW'; }
-  }
-  setText('threeCpuText', `${Math.round(load)}%`);
-  setText('threeInstText', `${instances} inst`);
-}
 
 // ─────────────────────────────────────────────────────────
 // AI PANEL
