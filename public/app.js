@@ -276,7 +276,7 @@ function updateKPIs(d) {
 
   // Cost
   setText('kCost', d.cost.perHour.toFixed(3));
-  setText('kCostFooter', `Total: $${d.cost.total.toFixed(3)}`);
+  setText('kCostFooter', `Total: ₹${d.cost.total.toFixed(3)}`);
 
   // Threshold alerts (using scaling config values)
   const UP = S.scalingConfig.scaleUpCpu || 70;
@@ -792,7 +792,7 @@ function renderAnalytics() {
   setText('sMinCpu', hist.length ? Math.min(...hist).toFixed(1) + '%' : '--');
   setText('sTotalReq', d.performance.requests);
   setText('sReqPerMin', Math.round((d.performance.requests / Math.max(d.system.uptime, 1)) * 60));
-  setText('sTotalCost', '$' + d.cost.total.toFixed(4));
+  setText('sTotalCost', '₹' + d.cost.total.toFixed(4));
   setText('sInstances', d.scaling.instances);
   renderMultiChart();
 }

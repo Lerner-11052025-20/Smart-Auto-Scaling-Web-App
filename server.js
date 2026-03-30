@@ -305,13 +305,23 @@ function tickMetrics() {
 
   state.cpuLoad = clamp(state.cpuLoad + noise * instFactor, 1, 100);
   state.memoryUsage = clamp(state.memoryUsage + (state.cpuLoad - state.memoryUsage) * 0.04 + (Math.random() - 0.5) * 3, 5, 95);
-  state.networkMbps = clamp(state.networkMbps + (Math.random() - 0.45) * 18, 0, 1000);
+  // Realistic Network Speed based on Load
+  const targetMbps = 25 + (state.cpuLoad * 1.6) + (state.requests * 0.5);
+  state.networkMbps = clamp(state.networkMbps + (targetMbps - state.networkMbps) * 0.3 + (Math.random() - 0.5) * 15, 5, 2000);
   state.diskIO = clamp(state.diskIO + (Math.random() - 0.5) * 6, 0, 100);
-  state.responseTime = clamp((50 + state.cpuLoad * 3) / state.instances + (Math.random() - 0.5) * 20, 10, 3000);
+
+  // Realistic Response Time tied to load per instance
+  const rtLoad = state.cpuLoad / state.instances;
+  const targetRt = 45 + (rtLoad * 2.8);
+  state.responseTime = clamp(state.responseTime + (targetRt - state.responseTime) * 0.35 + (Math.random() - 0.5) * 10, 12, 3000);
+
   state.errorRate = state.cpuLoad > 90
     ? parseFloat((Math.random() * 5).toFixed(2))
     : parseFloat((Math.random() * 0.4).toFixed(2));
-  state.costTotal += (state.instances * 0.085) / 3600;
+  
+  // INR Rate: ₹7.05 per instance per hour
+  const hourlyRateINR = 7.05;
+  state.costTotal += (state.instances * hourlyRateINR) / 3600;
 
   pushHist(history.cpu, state.cpuLoad);
   pushHist(history.mem, state.memoryUsage);
@@ -360,7 +370,7 @@ function buildPayload(prediction) {
       scaleDownThreshold: SCALING_CONFIG.scaleDownCpu,
     },
     ai: { prediction, enabled: state.aiEnabled, historySize: history.cpu.length },
-    cost: { perHour: Math.round(state.instances * 0.085 * 1000) / 1000, total: Math.round(state.costTotal * 1000) / 1000 },
+    cost: { perHour: Math.round(state.instances * 7.05 * 1000) / 1000, total: Math.round(state.costTotal * 1000) / 1000 },
     system: {
       uptime: state.uptime,
       status: state.cpuLoad > SCALING_CONFIG.scaleUpCpu ? 'critical'
