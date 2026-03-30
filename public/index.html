@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>CloudPulse AI — Smart Auto-Scaling Dashboard</title>
+  <meta name="description"
+    content="Enterprise real-time cloud resource optimizer with WebSocket-powered metrics, AI scaling, and 3D visualization." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <!-- D3.js -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <!-- Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+  <!-- Socket.IO Client — MUST load before app.js -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Inline: WebSocket connection status styles -->
+  <style>
+    .conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .conn-dot.on {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--glow-s);
+      animation: none;
+    }
+
+    .conn-dot.off {
+      background: var(--danger);
+      animation: dbBlink 1s infinite;
+    }
+
+    .ws-status-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11.5px;
+      color: var(--t2);
+    }
+
+    .rt-toggle-btn {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: var(--speed);
+    }
+
+    .rt-toggle-btn.active {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--success);
+    }
+
+    .rt-toggle-btn.paused {
+      background: rgba(250, 204, 21, 0.1);
+      border-color: rgba(250, 204, 21, 0.3);
+      color: var(--warning);
+    }
+
+    .rt-led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .rt-led.on {
+      background: var(--success);
+      box-shadow: 0 0 6px var(--glow-s);
+      animation: chipBlink 1.5s infinite;
+    }
+
+    .rt-led.off {
+      background: var(--warning);
+    }
+
+    .client-count {
+      font-size: 10.5px;
+      color: var(--t3);
+      font-family: var(--mono);
+    }
+
+    .aiPredLoad-unit {
+      font-size: 13px;
+      color: var(--t2);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!--  SIDEBAR                                     -->
+  <!-- ════════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="url(#bG)" stroke-width="2" />
+          <path d="M7 20L11 11L16 17L21 8L25 14" stroke="url(#bG)" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <circle cx="25" cy="14" r="3" fill="#6366f1" />
+          <defs>
+            <linearGradient id="bG" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#6366f1" />
+              <stop offset="100%" stop-color="#22d3ee" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">CloudPulse</span>
+        <span class="brand-pill">AI ENTERPRISE</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">MONITOR</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-link active" data-view="dashboard">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg></span>
+        <span class="nav-label">Dashboard</span>
+        <span class="live-chip">LIVE</span>
+        <span class="nav-glow"></span>
+      </a>
+      <a href="#" class="nav-link" data-view="analytics">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg></span>
+        <span class="nav-label">Analytics</span>
+      </a>
+      <a href="#" class="nav-link" data-view="scaling">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M18 20V10M12 20V4M6 20v-6" />
+          </svg></span>
+        <span class="nav-label">Auto-Scaling</span>
+        <span class="ai-chip">AI</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-section-label">SYSTEM</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-link" data-view="logs">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg></span>
+        <span class="nav-label">System Logs</span>
+      </a>
+      <a href="#" class="nav-link" data-view="settings">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg></span>
+        <span class="nav-label">Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <!-- WebSocket connection status -->
+      <div class="ws-status-row" style="margin-bottom:8px">
+        <span class="conn-dot off" id="connDot"></span>
+        <span id="connText">Connecting...</span>
+      </div>
+      <div class="db-status-row">
+        <span class="db-dot" id="dbDot"></span>
+        <span class="db-label" id="dbLabel">MongoDB...</span>
+      </div>
+      <div class="sidebar-ver">v2.0 Enterprise · Socket.IO</div>
+    </div>
+  </aside>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!--  MAIN WRAPPER                                -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="main-wrapper" id="mainWrapper">
+
+    <!-- TOP NAVBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="page-meta">
+          <h1 class="page-heading" id="pageHeading">Dashboard</h1>
+          <p class="page-sub" id="pageSub">Real-time WebSocket cloud monitoring</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <!-- Real-time ON/OFF toggle -->
+        <span class="rt-led on" id="realtimeLed" title="Stream status"></span>
+        <button class="rt-toggle-btn active" id="realtimeToggle">⏸ Pause</button>
+        <!-- Client count -->
+        <span class="client-count" id="clientCount">-- online</span>
+        <!-- Health -->
+        <div class="health-badge" id="healthBadge">
+          <span class="pulse-dot"></span>
+          <span id="healthLabel">System Healthy</span>
+        </div>
+        <!-- Uptime -->
+        <div class="uptime-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span id="uptimeBadge">0s</span>
+        </div>
+        <!-- Theme -->
+        <button class="icon-btn" id="themeBtn" title="Toggle Theme">
+          <svg class="sun-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg class="moon-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast Stack -->
+    <div class="toast-stack" id="toastStack"></div>
+
+    <!-- ════════ VIEW: DASHBOARD ════════ -->
+    <main class="view active" id="view-dashboard">
+
+      <!-- Skeleton -->
+      <div class="skeleton-grid" id="skeletonGrid">
+        <div class="skel-card"></div>
+        <div class="skel-card"></div>
+        <div class="skel-card"></div>
+        <div class="skel-card"></div>
+        <div class="skel-card"></div>
+        <div class="skel-card"></div>
+      </div>
+
+      <!-- KPI Row -->
+      <div class="kpi-row" id="kpiRow" style="display:none">
+
+        <div class="kpi-card" id="kpiCpu">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#6366f1">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <line x1="9" y1="1" x2="9" y2="4" />
+                <line x1="15" y1="1" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="23" />
+                <line x1="15" y1="20" x2="15" y2="23" />
+                <line x1="20" y1="9" x2="23" y2="9" />
+                <line x1="20" y1="14" x2="23" y2="14" />
+                <line x1="1" y1="9" x2="4" y2="9" />
+                <line x1="1" y1="14" x2="4" y2="14" />
+              </svg>
+            </div>
+            <span class="kpi-label">CPU Load</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-num" id="kCpu">--</span>
+            <span class="kpi-unit">%</span>
+            <span class="kpi-delta" id="kCpuDelta"></span>
+          </div>
+          <div class="kpi-bar-track">
+            <div class="kpi-bar" id="kCpuBar"></div>
+          </div>
+          <div class="kpi-footer" id="kCpuFooter">Connecting...</div>
+          <div id="sparkCpu" class="kpi-spark"></div>
+        </div>
+
+        <div class="kpi-card" id="kpiMem">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#ef4444">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+              </svg>
+            </div>
+            <span class="kpi-label">Memory</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-num" id="kMem">--</span>
+            <span class="kpi-unit">%</span>
+            <span class="kpi-delta" id="kMemDelta"></span>
+          </div>
+          <div class="kpi-bar-track">
+            <div class="kpi-bar" id="kMemBar"></div>
+          </div>
+          <div class="kpi-footer" id="kMemFooter">--</div>
+        </div>
+
+        <div class="kpi-card kpi-card--accent" id="kpiInst">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#22d3ee">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            <span class="kpi-label">EC2 Instances</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-num" id="kInst">--</span>
+            <span class="kpi-unit">/ 10</span>
+          </div>
+          <div class="inst-dots" id="instDots"></div>
+          <div class="kpi-footer" id="kInstFooter">AI auto-managed</div>
+        </div>
+
+        <div class="kpi-card" id="kpiNet">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#22d3ee">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12.55a11 11 0 0114.08 0" />
+                <path d="M1.42 9a16 16 0 0121.16 0" />
+                <path d="M8.53 16.11a6 6 0 016.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+            </div>
+            <span class="kpi-label">Network</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-num" id="kNet">--</span>
+            <span class="kpi-unit">Mbps</span>
+          </div>
+          <div class="kpi-footer">↕ Live WebSocket</div>
+        </div>
+
+        <div class="kpi-card" id="kpiRt">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#facc15">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <span class="kpi-label">Response Time</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-num" id="kRt">--</span>
+            <span class="kpi-unit">ms</span>
+          </div>
+          <div class="kpi-footer" id="kRtFooter">API latency</div>
+        </div>
+
+        <div class="kpi-card" id="kpiCost">
+          <div class="kpi-top">
+            <div class="kpi-icon-wrap" style="--ic:#22c55e">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+              </svg>
+            </div>
+            <span class="kpi-label">Cost / Hour</span>
+          </div>
+          <div class="kpi-val-row">
+            <span class="kpi-unit">$</span>
+            <span class="kpi-num" id="kCost">--</span>
+          </div>
+          <div class="kpi-footer" id="kCostFooter">Total: $0.000</div>
+        </div>
+
+      </div><!-- /kpi-row -->
+
+      <!-- Charts -->
+      <div class="charts-row" id="chartsRow" style="display:none">
+
+        <div class="glass-card chart-wide">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">CPU Load Timeline</h3>
+              <p class="card-sub">WebSocket stream — 30s window with AI prediction</p>
+            </div>
+            <div class="header-badges">
+              <span class="legend-item"><span class="ldot"
+                  style="background:linear-gradient(135deg,#6366f1,#22d3ee)"></span>CPU Load</span>
+              <span class="legend-item"><span class="ldot" style="background:#facc15;opacity:.75"></span>AI
+                Predicted</span>
+              <span class="live-tag"><span class="live-ring"></span>LIVE</span>
+            </div>
+          </div>
+          <div id="cpuChart" class="chart-area"></div>
+          <div class="chart-tooltip" id="cpuTooltip"></div>
+        </div>
+
+        <div class="glass-card three-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">3D Load Sphere</h3>
+              <p class="card-sub">Green &lt;30 · Yellow 30–70 · Red &gt;70</p>
+            </div>
+            <span class="load-badge" id="loadBadge">LOW</span>
+          </div>
+          <div class="three-wrap">
+            <canvas id="threeCanvas"></canvas>
+            <div class="three-overlay">
+              <div class="three-stat" id="threeCpuText">0%</div>
+              <div class="three-stat-label">CPU LOAD</div>
+              <div class="three-inst-text" id="threeInstText">1 inst</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Request Volume</h3>
+              <p class="card-sub">Total API hits</p>
+            </div>
+            <span class="total-req-badge" id="totalReqBadge">0 total</span>
+          </div>
+          <div id="reqChart" class="chart-area"></div>
+        </div>
+
+        <div class="glass-card gauge-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">System Gauge</h3>
+              <p class="card-sub">Overall load meter</p>
+            </div>
+          </div>
+          <div class="gauge-wrap">
+            <svg id="gaugeRing" width="190" height="190" viewBox="0 0 190 190"></svg>
+            <div class="gauge-inner">
+              <span id="gaugeNum">0</span>
+              <span class="gauge-pct">%</span>
+              <span class="gauge-state" id="gaugeState">NORMAL</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /charts-row -->
+
+      <!-- AI Panel + Controls -->
+      <div class="bottom-row" id="bottomRow" style="display:none">
+
+        <div class="glass-card ai-card">
+          <div class="ai-card-header">
+            <div class="ai-orb">
+              <span class="ai-orb-ring"></span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title" style="margin:0">AI Prediction Engine</h3>
+              <p class="card-sub" style="margin:0">ML forecasting · 30s horizon · WebSocket</p>
+            </div>
+            <div class="conf-badge">Confidence <span id="aiConf">--</span>%</div>
+          </div>
+          <div class="ai-grid">
+            <div class="ai-metric-box">
+              <span class="ai-mLabel">Predicted Load (30s)</span>
+              <span class="ai-mVal" id="aiPredLoad">--</span>
+            </div>
+            <div class="ai-metric-box">
+              <span class="ai-mLabel">Recommended Action</span>
+              <span class="ai-mVal ai-action-val" id="aiAction">--</span>
+            </div>
+            <div class="ai-metric-box">
+              <span class="ai-mLabel">Scale Cooldown</span>
+              <span class="ai-mVal" id="aiCooldown">--</span>
+            </div>
+            <div class="ai-metric-box">
+              <span class="ai-mLabel">Error Rate</span>
+              <span class="ai-mVal" id="aiErr">--</span>
+            </div>
+          </div>
+          <div class="conf-track-wrap">
+            <div class="conf-track-label">Prediction Confidence</div>
+            <div class="conf-track">
+              <div class="conf-fill" id="confFill"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card controls-card">
+          <div class="card-header">
+            <h3 class="card-title">⚡ Load Generator</h3>
+            <p class="card-sub">Trigger spikes → observe WebSocket reaction</p>
+          </div>
+          <div class="ctrl-btns">
+            <button class="ctrl-btn light" id="btnLight" onclick="generateLoad(0.3)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+              Light
+            </button>
+            <button class="ctrl-btn medium" id="btnMedium" onclick="generateLoad(0.7)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              Medium
+            </button>
+            <button class="ctrl-btn heavy" id="btnHeavy" onclick="generateLoad(1.5)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              Heavy
+            </button>
+          </div>
+          <div class="divider"></div>
+          <div class="scale-btns">
+            <button class="scale-btn scale-up" id="btnScaleUp" onclick="manualScale('up')">▲ Add Instance</button>
+            <button class="scale-btn scale-down" id="btnScaleDown" onclick="manualScale('down')">▼ Remove
+              Instance</button>
+          </div>
+          <div class="divider"></div>
+          <div class="force-label">⚡ FORCE SCALE — bypasses cooldown</div>
+          <div class="force-btns">
+            <button class="force-btn force-up" id="btnForceUp" onclick="forceScale('up')">🔺 Force Up</button>
+            <button class="force-btn force-down" id="btnForceDown" onclick="forceScale('down')">🔻 Force Down</button>
+          </div>
+          <div class="ctrl-status" id="ctrlStatus">WebSocket connected — ready</div>
+        </div>
+
+      </div><!-- /bottom-row -->
+    </main>
+
+    <!-- ════════ VIEW: ANALYTICS ════════ -->
+    <main class="view" id="view-analytics">
+      <div class="analytics-layout">
+        <div class="glass-card span-2">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Multi-Metric Overview</h3>
+              <p class="card-sub">CPU · Memory · Disk I/O — last 30s via WebSocket</p>
+            </div>
+            <div style="display:flex;gap:12px">
+              <span class="legend-item"><span class="ldot" style="background:#6366f1"></span>CPU</span>
+              <span class="legend-item"><span class="ldot" style="background:#ef4444"></span>Memory</span>
+              <span class="legend-item"><span class="ldot" style="background:#22d3ee"></span>Disk IO</span>
+            </div>
+          </div>
+          <div id="analyticsChart" class="chart-area" style="min-height:240px"></div>
+        </div>
+        <div class="glass-card span-2">
+          <div class="card-header">
+            <h3 class="card-title">Live Stats</h3>
+          </div>
+          <div class="stats-table">
+            <div class="stats-row"><span>Average CPU (30s)</span><strong id="sAvgCpu">--</strong></div>
+            <div class="stats-row"><span>Peak CPU</span><strong id="sPeakCpu">--</strong></div>
+            <div class="stats-row"><span>Min CPU</span><strong id="sMinCpu">--</strong></div>
+            <div class="stats-row"><span>Total Requests</span><strong id="sTotalReq">--</strong></div>
+            <div class="stats-row"><span>Requests / min</span><strong id="sReqPerMin">--</strong></div>
+            <div class="stats-row"><span>Total Cost</span><strong id="sTotalCost">--</strong></div>
+            <div class="stats-row"><span>Active Instances</span><strong id="sInstances">--</strong></div>
+            <div class="stats-row"><span>Data Source</span><strong style="color:var(--success)">WebSocket</strong></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ════════ VIEW: SCALING ════════ -->
+    <main class="view" id="view-scaling">
+      <div class="scaling-layout">
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">EC2 Instance Grid</h3>
+            <p class="card-sub">Auto-managed · Max 5 · Cooldown 10s</p>
+          </div>
+          <div id="instanceGrid" class="instance-grid"></div>
+          <div class="inst-stats">
+            <div class="inst-stat"><span>Active</span><strong id="ssActive">--</strong></div>
+            <div class="inst-stat"><span>Max</span><strong>5</strong></div>
+            <div class="inst-stat"><span>Min</span><strong>1</strong></div>
+            <div class="inst-stat"><span>Cooldown</span><strong id="ssCooldown">--</strong></div>
+          </div>
+          <div class="inst-chart-wrap">
+            <div class="inst-chart-label">Instance Count History (30s)</div>
+            <div id="instChart" style="width:100%;height:120px;"></div>
+          </div>
+          <div class="scale-btns" style="margin-top:10px">
+            <button class="scale-btn scale-up" onclick="manualScale('up')">▲ Add Instance</button>
+            <button class="scale-btn scale-down" onclick="manualScale('down')">▼ Remove Instance</button>
+          </div>
+          <div class="force-btns">
+            <button class="force-btn force-up" id="scalingForceUp" onclick="forceScale('up')">🔺 Force Up</button>
+            <button class="force-btn force-down" id="scalingForceDown" onclick="forceScale('down')">🔻 Force
+              Down</button>
+          </div>
+          <div class="ssLastAction">Last action: <span id="ssLastAction">none</span></div>
+        </div>
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">Scaling Event Log</h3>
+            <p class="card-sub">Real-time via WebSocket</p>
+          </div>
+          <div id="scalingLog" class="scaling-log"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ════════ VIEW: LOGS ════════ -->
+    <main class="view" id="view-logs">
+      <div class="glass-card logs-card">
+        <div class="card-header">
+          <h3 class="card-title">System Logs <span class="log-count-badge" id="logCount">0</span></h3>
+          <div class="log-filter-tabs">
+            <button class="log-tab active" data-filter="all">All</button>
+            <button class="log-tab" data-filter="info">Info</button>
+            <button class="log-tab" data-filter="warn">Warn</button>
+            <button class="log-tab" data-filter="error">Error</button>
+            <button class="log-tab" data-filter="success">Success</button>
+          </div>
+        </div>
+        <div id="logsBody" class="logs-scroll"></div>
+      </div>
+    </main>
+
+    <!-- ════════ VIEW: SETTINGS ════════ -->
+    <main class="view" id="view-settings">
+      <div class="settings-grid">
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">Scaling Configuration</h3>
+          </div>
+          <div class="settings-body">
+            <div class="field-group">
+              <label class="field-label">Scale Up Threshold (CPU %)</label>
+              <div class="field-control">
+                <input type="range" class="slider" id="cfgUp" min="50" max="95" value="80" />
+                <span class="slider-display" id="cfgUpVal">80%</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Scale Down Threshold (CPU %)</label>
+              <div class="field-control">
+                <input type="range" class="slider" id="cfgDown" min="5" max="40" value="20" />
+                <span class="slider-display" id="cfgDownVal">20%</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Max Instances</label>
+              <div class="field-control">
+                <input type="range" class="slider" id="cfgMax" min="2" max="20" value="10" />
+                <span class="slider-display" id="cfgMaxVal">10</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">AI Predictive Scaling</label>
+              <div class="toggle-row">
+                <label class="toggle"><input type="checkbox" id="cfgAI" checked /><span
+                    class="toggle-knob"></span></label>
+                <span class="field-label" style="opacity:1">Enabled</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="card-header">
+            <h3 class="card-title">Stack Information</h3>
+          </div>
+          <div class="settings-body">
+            <div class="info-pair"><span>Real-Time</span><strong style="color:var(--success)">Socket.IO v4</strong>
+            </div>
+            <div class="info-pair"><span>Backend</span><strong>Node.js + Express</strong></div>
+            <div class="info-pair"><span>Database</span><strong>MongoDB Atlas</strong></div>
+            <div class="info-pair"><span>AI Engine</span><strong>ML + Linear Regression</strong></div>
+            <div class="info-pair"><span>Charts</span><strong>D3.js v7 + Three.js</strong></div>
+            <div class="info-pair"><span>Version</span><strong>2.0.0 Enterprise</strong></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div><!-- /main-wrapper -->
+
+  <!-- app.js loaded last so DOM is ready -->
+  <script src="app.js"></script>
+</body>
+
+</html>
