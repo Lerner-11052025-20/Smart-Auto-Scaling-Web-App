@@ -342,7 +342,7 @@
           </div>
           <div class="kpi-val-row">
             <span class="kpi-num" id="kInst">--</span>
-            <span class="kpi-unit">/ 10</span>
+            <span class="kpi-unit">/ 5</span>
           </div>
           <div class="inst-dots" id="instDots"></div>
           <div class="kpi-footer" id="kInstFooter">AI auto-managed</div>
@@ -544,24 +544,197 @@
 
     <!-- ════════ VIEW: ANALYTICS ════════ -->
     <main class="view" id="view-analytics">
-      <div class="analytics-layout">
-        <div class="glass-card span-2">
+
+      <!-- Time Range Selector -->
+      <div class="hist-timerange" id="histTimeRange">
+        <div class="hist-timerange-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          Time Range
+        </div>
+        <div class="hist-tabs">
+          <button class="hist-tab active" data-range="live">
+            <span class="hist-tab-dot live"></span>LIVE
+          </button>
+          <button class="hist-tab" data-range="1h">1H</button>
+          <button class="hist-tab" data-range="6h">6H</button>
+          <button class="hist-tab" data-range="24h">24H</button>
+          <button class="hist-tab" data-range="7d">7D</button>
+        </div>
+        <div class="hist-source" id="histSource">
+          <span class="hist-source-dot"></span>
+          <span id="histSourceLabel">WebSocket · Live</span>
+        </div>
+      </div>
+
+      <!-- Analytics Summary KPIs -->
+      <div class="hist-kpi-row" id="histKpiRow">
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#6366f1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkAvgCpu">--</span>
+            <span class="hist-kpi-label">Avg CPU</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#ef4444">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkPeakCpu">--</span>
+            <span class="hist-kpi-label">Peak CPU</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#22d3ee">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkAvgMem">--</span>
+            <span class="hist-kpi-label">Avg Memory</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#facc15">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkAvgRt">--</span>
+            <span class="hist-kpi-label">Avg Resp Time</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#22c55e">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkTotalCost">--</span>
+            <span class="hist-kpi-label">Total Cost</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#6366f1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 20V10M12 20V4M6 20v-6" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkScaleEvents">--</span>
+            <span class="hist-kpi-label">Scale Events</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#22c55e">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="8.5" cy="7" r="4" />
+              <polyline points="17 11 19 13 23 9" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkSavings">--</span>
+            <span class="hist-kpi-label">Cost Savings</span>
+          </div>
+        </div>
+        <div class="hist-kpi">
+          <div class="hist-kpi-icon" style="--hk-c:#38bdf8">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </div>
+          <div class="hist-kpi-data">
+            <span class="hist-kpi-val" id="hkErrorRate">--</span>
+            <span class="hist-kpi-label">Error Rate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historical Charts Grid -->
+      <div class="hist-charts-grid">
+
+        <!-- CPU + Memory + Network Historical Chart -->
+        <div class="glass-card hist-chart-wide">
           <div class="card-header">
             <div>
-              <h3 class="card-title">Multi-Metric Overview</h3>
-              <p class="card-sub">CPU · Memory · Disk I/O — last 30s via WebSocket</p>
+              <h3 class="card-title">📊 Resource Utilization History</h3>
+              <p class="card-sub" id="histChartSub">CPU · Memory · Network — last 30s via WebSocket</p>
             </div>
-            <div style="display:flex;gap:12px">
-              <span class="legend-item"><span class="ldot" style="background:#6366f1"></span>CPU</span>
+            <div class="header-badges">
+              <span class="legend-item"><span class="ldot"
+                  style="background:linear-gradient(135deg,#6366f1,#818cf8)"></span>CPU</span>
               <span class="legend-item"><span class="ldot" style="background:#ef4444"></span>Memory</span>
-              <span class="legend-item"><span class="ldot" style="background:#22d3ee"></span>Disk IO</span>
+              <span class="legend-item"><span class="ldot" style="background:#22d3ee"></span>Network</span>
+              <span class="live-tag" id="histLiveTag"><span class="live-ring"></span>LIVE</span>
             </div>
           </div>
-          <div id="analyticsChart" class="chart-area" style="min-height:240px"></div>
+          <div id="histResourceChart" class="chart-area" style="min-height:260px"></div>
+          <div class="chart-tooltip" id="histResourceTooltip"></div>
         </div>
-        <div class="glass-card span-2">
+
+        <!-- Cost Analytics Chart -->
+        <div class="glass-card">
           <div class="card-header">
-            <h3 class="card-title">Live Stats</h3>
+            <div>
+              <h3 class="card-title">💰 Cost Analytics</h3>
+              <p class="card-sub">Instance cost trend over time</p>
+            </div>
+            <span class="hist-cost-badge" id="histCostBadge">₹0.000/hr</span>
+          </div>
+          <div id="histCostChart" class="chart-area" style="min-height:200px"></div>
+        </div>
+
+        <!-- Scaling Timeline -->
+        <div class="glass-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">⚡ Scaling Timeline</h3>
+              <p class="card-sub">Instance count changes over time</p>
+            </div>
+            <div class="hist-scale-summary">
+              <span class="hist-scale-pill up" id="histScaleUp">▲ 0</span>
+              <span class="hist-scale-pill down" id="histScaleDown">▼ 0</span>
+            </div>
+          </div>
+          <div id="histScaleChart" class="chart-area" style="min-height:200px"></div>
+        </div>
+
+        <!-- Response Time Distribution -->
+        <div class="glass-card hist-chart-wide">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">⏱️ Response Time Trend</h3>
+              <p class="card-sub">Latency pattern with percentile bands</p>
+            </div>
+            <div class="header-badges">
+              <span class="legend-item"><span class="ldot" style="background:#facc15"></span>Response Time</span>
+              <span class="legend-item"><span class="ldot" style="background:rgba(250,204,21,0.2)"></span>P95
+                Band</span>
+            </div>
+          </div>
+          <div id="histRtChart" class="chart-area" style="min-height:200px"></div>
+        </div>
+
+        <!-- Live Stats Table -->
+        <div class="glass-card hist-stats-card">
+          <div class="card-header">
+            <h3 class="card-title">📋 Detailed Statistics</h3>
           </div>
           <div class="stats-table">
             <div class="stats-row"><span>Average CPU (30s)</span><strong id="sAvgCpu">--</strong></div>
@@ -571,9 +744,22 @@
             <div class="stats-row"><span>Requests / min</span><strong id="sReqPerMin">--</strong></div>
             <div class="stats-row"><span>Total Cost</span><strong id="sTotalCost">--</strong></div>
             <div class="stats-row"><span>Active Instances</span><strong id="sInstances">--</strong></div>
-            <div class="stats-row"><span>Data Source</span><strong style="color:var(--success)">WebSocket</strong></div>
+            <div class="stats-row"><span>Data Source</span><strong style="color:var(--success)"
+                id="sDataSource">WebSocket</strong></div>
           </div>
         </div>
+
+        <!-- Scaling Event Log -->
+        <div class="glass-card hist-stats-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">📜 Recent Scaling Events</h3>
+              <p class="card-sub" id="histEventsSub">Real-time event stream</p>
+            </div>
+          </div>
+          <div id="histScaleLog" class="scaling-log" style="max-height:320px"></div>
+        </div>
+
       </div>
     </main>
 
@@ -592,103 +778,111 @@
             <div class="inst-stat"><span>Min</span><strong>1</strong></div>
             <div class="inst-stat"><span>Cooldown</span><strong id="ssCooldown">--</strong></div>
           </div>
-          <div class="inst-chart-wrap">
-            <div class="inst-chart-label">Instance Count History (30s)</div>
-            <div id="instChart" style="width:100%;height:120px;"></div>
-          </div>
-          <div class="scale-btns" style="margin-top:10px">
-            <button class="scale-btn scale-up" onclick="manualScale('up')">▲ Add Instance</button>
-            <button class="scale-btn scale-down" onclick="manualScale('down')">▼ Remove Instance</button>
-          </div>
-          <div class="force-btns">
-            <button class="force-btn force-up" id="scalingForceUp" onclick="forceScale('up')">🔺 Force Up</button>
-            <button class="force-btn force-down" id="scalingForceDown" onclick="forceScale('down')">🔻 Force
-              Down</button>
-          </div>
-          <div class="ssLastAction">Last action: <span id="ssLastAction">none</span></div>
         </div>
-        <div class="glass-card">
-          <div class="card-header">
-            <h3 class="card-title">Scaling Event Log</h3>
-            <p class="card-sub">Real-time via WebSocket</p>
-          </div>
-          <div id="scalingLog" class="scaling-log"></div>
+        <div class="scale-btns" style="margin-top:10px">
+          <button class="scale-btn scale-up" onclick="manualScale('up')">▲ Add Instance</button>
+          <button class="scale-btn scale-down" onclick="manualScale('down')">▼ Remove Instance</button>
         </div>
+        <div class="force-btns">
+          <button class="force-btn force-up" id="scalingForceUp" onclick="forceScale('up')">🔺 Force Up</button>
+          <button class="force-btn force-down" id="scalingForceDown" onclick="forceScale('down')">🔻 Force
+            Down</button>
+        </div>
+        <div class="ssLastAction">Last action: <span id="ssLastAction">none</span></div>
       </div>
-    </main>
-
-    <!-- ════════ VIEW: LOGS ════════ -->
-    <main class="view" id="view-logs">
-      <div class="glass-card logs-card">
+      <div class="glass-card">
         <div class="card-header">
-          <h3 class="card-title">System Logs <span class="log-count-badge" id="logCount">0</span></h3>
-          <div class="log-filter-tabs">
-            <button class="log-tab active" data-filter="all">All</button>
-            <button class="log-tab" data-filter="info">Info</button>
-            <button class="log-tab" data-filter="warn">Warn</button>
-            <button class="log-tab" data-filter="error">Error</button>
-            <button class="log-tab" data-filter="success">Success</button>
+          <div>
+            <h3 class="card-title">Scaling Performance Timeline</h3>
+            <p class="card-sub">Real-time instance count & events</p>
+          </div>
+          <div class="header-badges">
+            <span class="legend-item"><span class="ldot" style="background:var(--indigo)"></span>Active Instances</span>
+            <span class="live-tag"><span class="live-ring"></span>LIVE</span>
           </div>
         </div>
-        <div id="logsBody" class="logs-scroll"></div>
+        <div id="instChart" class="chart-area" style="height:220px; margin-bottom: 20px;"></div>
+        <div class="divider"></div>
+        <div class="card-header" style="margin-top: 15px; margin-bottom: 10px;">
+          <h3 class="card-title">Recent Scaling Events</h3>
+        </div>
+        <div id="scalingLog" class="scaling-log"></div>
       </div>
-    </main>
+  </div>
+  </main>
 
-    <!-- ════════ VIEW: SETTINGS ════════ -->
-    <main class="view" id="view-settings">
-      <div class="settings-grid">
-        <div class="glass-card">
-          <div class="card-header">
-            <h3 class="card-title">Scaling Configuration</h3>
-          </div>
-          <div class="settings-body">
-            <div class="field-group">
-              <label class="field-label">Scale Up Threshold (CPU %)</label>
-              <div class="field-control">
-                <input type="range" class="slider" id="cfgUp" min="50" max="95" value="80" />
-                <span class="slider-display" id="cfgUpVal">80%</span>
-              </div>
-            </div>
-            <div class="field-group">
-              <label class="field-label">Scale Down Threshold (CPU %)</label>
-              <div class="field-control">
-                <input type="range" class="slider" id="cfgDown" min="5" max="40" value="20" />
-                <span class="slider-display" id="cfgDownVal">20%</span>
-              </div>
-            </div>
-            <div class="field-group">
-              <label class="field-label">Max Instances</label>
-              <div class="field-control">
-                <input type="range" class="slider" id="cfgMax" min="2" max="20" value="10" />
-                <span class="slider-display" id="cfgMaxVal">10</span>
-              </div>
-            </div>
-            <div class="field-group">
-              <label class="field-label">AI Predictive Scaling</label>
-              <div class="toggle-row">
-                <label class="toggle"><input type="checkbox" id="cfgAI" checked /><span
-                    class="toggle-knob"></span></label>
-                <span class="field-label" style="opacity:1">Enabled</span>
-              </div>
-            </div>
-          </div>
+  <!-- ════════ VIEW: LOGS ════════ -->
+  <main class="view" id="view-logs">
+    <div class="glass-card logs-card">
+      <div class="card-header">
+        <h3 class="card-title">System Logs <span class="log-count-badge" id="logCount">0</span></h3>
+        <div class="log-filter-tabs">
+          <button class="log-tab active" data-filter="all">All</button>
+          <button class="log-tab" data-filter="info">Info</button>
+          <button class="log-tab" data-filter="warn">Warn</button>
+          <button class="log-tab" data-filter="error">Error</button>
+          <button class="log-tab" data-filter="success">Success</button>
         </div>
-        <div class="glass-card">
-          <div class="card-header">
-            <h3 class="card-title">Stack Information</h3>
-          </div>
-          <div class="settings-body">
-            <div class="info-pair"><span>Real-Time</span><strong style="color:var(--success)">Socket.IO v4</strong>
+      </div>
+      <div id="logsBody" class="logs-scroll"></div>
+    </div>
+  </main>
+
+  <!-- ════════ VIEW: SETTINGS ════════ -->
+  <main class="view" id="view-settings">
+    <div class="settings-grid">
+      <div class="glass-card">
+        <div class="card-header">
+          <h3 class="card-title">Scaling Configuration</h3>
+        </div>
+        <div class="settings-body">
+          <div class="field-group">
+            <label class="field-label">Scale Up Threshold (CPU %)</label>
+            <div class="field-control">
+              <input type="range" class="slider" id="cfgUp" min="50" max="95" value="80" />
+              <span class="slider-display" id="cfgUpVal">80%</span>
             </div>
-            <div class="info-pair"><span>Backend</span><strong>Node.js + Express</strong></div>
-            <div class="info-pair"><span>Database</span><strong>MongoDB Atlas</strong></div>
-            <div class="info-pair"><span>AI Engine</span><strong>ML + Linear Regression</strong></div>
-            <div class="info-pair"><span>Charts</span><strong>D3.js v7 + Three.js</strong></div>
-            <div class="info-pair"><span>Version</span><strong>2.0.0 Enterprise</strong></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Scale Down Threshold (CPU %)</label>
+            <div class="field-control">
+              <input type="range" class="slider" id="cfgDown" min="5" max="40" value="20" />
+              <span class="slider-display" id="cfgDownVal">20%</span>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Max Instances</label>
+            <div class="field-control">
+              <input type="range" class="slider" id="cfgMax" min="2" max="20" value="10" />
+              <span class="slider-display" id="cfgMaxVal">10</span>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">AI Predictive Scaling</label>
+            <div class="toggle-row">
+              <label class="toggle"><input type="checkbox" id="cfgAI" checked /><span
+                  class="toggle-knob"></span></label>
+              <span class="field-label" style="opacity:1">Enabled</span>
+            </div>
           </div>
         </div>
       </div>
-    </main>
+      <div class="glass-card">
+        <div class="card-header">
+          <h3 class="card-title">Stack Information</h3>
+        </div>
+        <div class="settings-body">
+          <div class="info-pair"><span>Real-Time</span><strong style="color:var(--success)">Socket.IO v4</strong>
+          </div>
+          <div class="info-pair"><span>Backend</span><strong>Node.js + Express</strong></div>
+          <div class="info-pair"><span>Database</span><strong>MongoDB Atlas</strong></div>
+          <div class="info-pair"><span>AI Engine</span><strong>ML + Linear Regression</strong></div>
+          <div class="info-pair"><span>Charts</span><strong>D3.js v7 + Three.js</strong></div>
+          <div class="info-pair"><span>Version</span><strong>2.0.0 Enterprise</strong></div>
+        </div>
+      </div>
+    </div>
+  </main>
 
   </div><!-- /main-wrapper -->
 

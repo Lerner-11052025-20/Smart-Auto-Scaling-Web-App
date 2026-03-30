@@ -53,8 +53,10 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 const MetricSchema = new mongoose.Schema({
   cpuLoad: Number, memoryUsage: Number, requests: Number,
   instances: Number, networkMbps: Number, responseTime: Number,
+  diskIO: Number, errorRate: Number, costTotal: Number,
   timestamp: { type: Date, default: Date.now }
 });
+MetricSchema.index({ timestamp: -1 });
 const LogSchema = new mongoose.Schema({
   message: String, level: String, component: { type: String, default: 'SYSTEM' },
   timestamp: { type: Date, default: Date.now }
@@ -313,15 +315,17 @@ function tickMetrics() {
   // Realistic Response Time tied to load per instance
   const rtLoad = state.cpuLoad / state.instances;
   const targetRt = 45 + (rtLoad * 2.8);
-  state.responseTime = clamp(state.responseTime + (targetRt - state.responseTime) * 0.35 + (Math.random() - 0.5) * 10, 12, 3000);
+  state.responseTime = clamp(state.responseTime + (targetRt - state.responseTime) * 0.35 + (Math.random() - 0.5) * 35, 12, 3000);
 
   state.errorRate = state.cpuLoad > 90
     ? parseFloat((Math.random() * 5).toFixed(2))
     : parseFloat((Math.random() * 0.4).toFixed(2));
   
-  // INR Rate: ₹7.05 per instance per hour
-  const hourlyRateINR = 7.05;
-  state.costTotal += (state.instances * hourlyRateINR) / 3600;
+  // INR Rate: ₹7.05 per instance compute + dynamic data transfer cost for waviness
+  const baseCompute = state.instances * 7.05;
+  const dataCost = state.networkMbps * 0.002;
+  state.costPerHourFloat = baseCompute + dataCost;
+  state.costTotal += state.costPerHourFloat / 3600;
 
   pushHist(history.cpu, state.cpuLoad);
   pushHist(history.mem, state.memoryUsage);
@@ -331,12 +335,14 @@ function tickMetrics() {
   const prediction = predictLoad(history.cpu);
   pushHist(history.pred, prediction.nextLoad);
 
-  // Persist to MongoDB every 10s
-  if (state.uptime % 10 === 0 && mongoose.connection.readyState === 1) {
+  // Persist to MongoDB every 5s for richer history
+  if (state.uptime % 5 === 0 && mongoose.connection.readyState === 1) {
     new Metric({
       cpuLoad: state.cpuLoad, memoryUsage: state.memoryUsage,
       requests: state.requests, instances: state.instances,
       networkMbps: state.networkMbps, responseTime: state.responseTime,
+      diskIO: state.diskIO, errorRate: state.errorRate,
+      costTotal: state.costTotal,
     }).save().catch(() => { });
   }
 
@@ -370,7 +376,7 @@ function buildPayload(prediction) {
       scaleDownThreshold: SCALING_CONFIG.scaleDownCpu,
     },
     ai: { prediction, enabled: state.aiEnabled, historySize: history.cpu.length },
-    cost: { perHour: Math.round(state.instances * 7.05 * 1000) / 1000, total: Math.round(state.costTotal * 1000) / 1000 },
+    cost: { perHour: Math.round((state.costPerHourFloat || (state.instances * 7.05)) * 1000) / 1000, total: Math.round(state.costTotal * 1000) / 1000 },
     system: {
       uptime: state.uptime,
       status: state.cpuLoad > SCALING_CONFIG.scaleUpCpu ? 'critical'
@@ -523,6 +529,83 @@ app.get('/api/metrics/history', async (req, res) => {
     if (mongoose.connection.readyState !== 1) return res.json({ metrics: [], source: 'unavailable' });
     const m = await Metric.find().sort({ timestamp: -1 }).limit(60);
     res.json({ metrics: m, source: 'mongodb' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── HISTORICAL ANALYTICS ENDPOINTS ──────────────────
+// Detailed metrics history with time range + limit
+app.get('/api/metrics/history/detailed', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      // Fallback: return in-memory history as fake MongoDB data
+      const fakeMetrics = history.cpu.slice(-60).map((cpu, i) => ({
+        cpuLoad: cpu, memoryUsage: history.mem[i] || 0,
+        networkMbps: history.net[i] || 0, diskIO: history.disk[i] || 0,
+        instances: state.instances, responseTime: state.responseTime,
+        requests: state.requests, errorRate: state.errorRate,
+        costTotal: state.costTotal,
+        timestamp: new Date(Date.now() - (history.cpu.length - i) * 1000)
+      }));
+      return res.json({ metrics: fakeMetrics, source: 'memory', count: fakeMetrics.length });
+    }
+    const range = req.query.range || '1h'; // 1h, 6h, 24h, 7d
+    const limit = Math.min(parseInt(req.query.limit) || 200, 500);
+    const rangeMs = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 };
+    const since = new Date(Date.now() - (rangeMs[range] || 3600000));
+    const metrics = await Metric.find({ timestamp: { $gte: since } })
+      .sort({ timestamp: 1 }).limit(limit).lean();
+    res.json({ metrics, source: 'mongodb', count: metrics.length, range });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Scaling events history from MongoDB
+app.get('/api/scaling/events/history', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({ events: scalingEvents.slice(0, 50), source: 'memory' });
+    }
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const events = await ScalingEvent.find().sort({ timestamp: -1 }).limit(limit).lean();
+    res.json({ events, source: 'mongodb', count: events.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Analytics summary — computed aggregates
+app.get('/api/analytics/summary', async (req, res) => {
+  try {
+    const cpuHist = history.cpu;
+    const memHist = history.mem;
+    const avgCpu = cpuHist.length ? cpuHist.reduce((a, b) => a + b, 0) / cpuHist.length : 0;
+    const peakCpu = cpuHist.length ? Math.max(...cpuHist) : 0;
+    const avgMem = memHist.length ? memHist.reduce((a, b) => a + b, 0) / memHist.length : 0;
+    const totalEventsUp = scalingEvents.filter(e => e.action === 'scale_up').length;
+    const totalEventsDown = scalingEvents.filter(e => e.action === 'scale_down').length;
+    // Cost savings estimate: cost if always max vs actual
+    const maxCostPerHour = SCALING_CONFIG.maxInstances * 7.05;
+    const actualCostPerHour = state.instances * 7.05;
+    const savingsPercent = maxCostPerHour > 0 ? ((1 - actualCostPerHour / maxCostPerHour) * 100).toFixed(1) : 0;
+    res.json({
+      avgCpu: Math.round(avgCpu * 10) / 10,
+      peakCpu: Math.round(peakCpu * 10) / 10,
+      avgMemory: Math.round(avgMem * 10) / 10,
+      totalRequests: state.requests,
+      totalCost: Math.round(state.costTotal * 1000) / 1000,
+      costPerHour: actualCostPerHour,
+      costSavingsPercent: parseFloat(savingsPercent),
+      activeInstances: state.instances,
+      maxInstances: SCALING_CONFIG.maxInstances,
+      scaleUpEvents: totalEventsUp,
+      scaleDownEvents: totalEventsDown,
+      uptime: state.uptime,
+      avgResponseTime: Math.round(state.responseTime),
+      errorRate: state.errorRate,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

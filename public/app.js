@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────
 const S = {
   cpu: [], pred: [], mem: [], disk: [], net: [], req: [],
+  rt: [], inst: [], cost: [],
   logs: [], scalingEvents: [],
   latest: null,
   view: 'dashboard',
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupLogTabs();
   setupRipple();
   setupRealtimeToggle();
+  setupHistTabs();
   connectSocket();
   boot();
 });
@@ -77,7 +79,7 @@ function setupResizeObserver() {
         initGauge(); updateGauge(S.latest?.cpu?.load || 0);
         initSparklines(); updateSparklines();
       } else if (S.view === 'analytics') {
-        renderMultiChart();
+        renderAnalytics();
       } else if (S.view === 'scaling') {
         initInstanceChart(); updateInstanceChart(S.latest?.scaling?.instances || 1);
       }
@@ -116,6 +118,9 @@ function connectSocket() {
     push(S.disk, data.disk.io, MAX);
     push(S.net, data.network.mbps, MAX);
     push(S.req, data.performance.requests, 30);
+    push(S.rt, data.performance.responseTime, MAX);
+    push(S.inst, data.scaling.instances, MAX);
+    push(S.cost, data.cost.perHour, MAX);
 
     updateKPIs(data);
     updateCpuChart();
@@ -262,7 +267,7 @@ function updateKPIs(d) {
     renderInstDots(inst, d.scaling.maxInstances);
     prevVals.inst = inst;
   }
-  setText('kInstFooter', `Cooldown: ${d.scaling.cooldownRemaining}s | Max: ${d.scaling.maxInstances}`);
+  setText('kInstFooter', `Time: ${d.scaling.cooldownRemaining}s | Max: ${d.scaling.maxInstances}`);
 
   // Network
   animNum('kNet', d.network.mbps.toFixed(1));
@@ -412,15 +417,15 @@ function initCpuChart() {
   g.append('path').attr('id', 'cpuArea').attr('fill', 'url(#cpuAG)');
   g.append('path').attr('id', 'predLine').attr('fill', 'none')
     .attr('stroke', C.warning).attr('stroke-width', '1.5').attr('stroke-dasharray', '5 4').attr('opacity', '0.7');
-  
+
   g.append('path').attr('id', 'cpuLine').attr('fill', 'none')
     .attr('stroke', 'url(#cpuLG)').attr('stroke-width', '3').attr('stroke-linecap', 'round')
     .attr('filter', 'url(#cpuGlow)');
-    
+
   g.append('circle').attr('id', 'cpuDot').attr('r', '6')
     .attr('fill', '#fff').attr('stroke', C.cyan).attr('stroke-width', '2.5')
     .attr('filter', 'url(#cpuGlow)');
-    
+
   g.append('g').attr('class', 'd3-axis').attr('id', 'cpuAxisX').attr('transform', `translate(0,${h})`);
   g.append('g').attr('class', 'd3-axis').attr('id', 'cpuAxisY');
 
@@ -471,17 +476,30 @@ const instHistory = [];
 function initInstanceChart() {
   const wrap = el('instChart'); if (!wrap) return;
   wrap.innerHTML = '';
-  const m = { t: 8, r: 8, b: 24, l: 30 };
-  const W = Math.max(wrap.clientWidth, 280), H = 120;
+  const m = { t: 15, r: 20, b: 35, l: 40 };
+  const W = Math.max(wrap.clientWidth, 400), H = 220;
   const w = W - m.l - m.r, h = H - m.t - m.b;
+
   const svg = d3.select('#instChart').append('svg').attr('width', W).attr('height', H);
+  const defs = svg.append('defs');
+
+  // Local gradient to avoid dependency issues
+  const lg = defs.append('linearGradient').attr('id', 'instLG').attr('x1', '0').attr('x2', '0').attr('y1', '0').attr('y2', '1');
+  lg.append('stop').attr('offset', '0%').attr('stop-color', C.cyan).attr('stop-opacity', 0.25);
+  lg.append('stop').attr('offset', '100%').attr('stop-color', C.indigo).attr('stop-opacity', 0);
+
   const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
+
+  // Grid
+  g.append('g').attr('id', 'instGridY').attr('class', 'd3-grid');
+
+  g.append('path').attr('id', 'instArea').attr('fill', 'url(#instLG)');
+  g.append('path').attr('id', 'instLine').attr('fill', 'none')
+    .attr('stroke', C.cyan).attr('stroke-width', '3').attr('stroke-linecap', 'round');
+
   g.append('g').attr('class', 'd3-axis').attr('id', 'instAxisX').attr('transform', `translate(0,${h})`);
   g.append('g').attr('class', 'd3-axis').attr('id', 'instAxisY');
-  g.append('path').attr('id', 'instLine').attr('fill', 'none')
-    .attr('stroke', 'url(#cpuLG)').attr('stroke-width', '2').attr('stroke-linecap', 'round');
-  // step coloured area
-  g.append('path').attr('id', 'instArea').attr('fill', 'rgba(99,102,241,0.12)');
+
   Charts.instChart = { g, w, h };
 }
 
@@ -491,15 +509,24 @@ function updateInstanceChart(inst) {
   const { g, w, h } = Charts.instChart;
   const data = instHistory;
   const n = data.length;
-  const x = d3.scaleLinear().domain([0, 29]).range([0, w]);
   const max = S.scalingConfig.maxInstances || 5;
+
+  const x = d3.scaleLinear().domain([0, 29]).range([0, w]);
   const y = d3.scaleLinear().domain([0, max]).range([h, 0]);
+
+  // Horizontal Grid Lines
+  g.select('#instGridY').call(d3.axisLeft(y).ticks(max).tickSize(-w).tickFormat(''))
+    .selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  g.select('#instGridY .domain').remove();
+
   const lineG = d3.line().x((_, i) => x(i + 30 - n)).y(d => y(d)).curve(d3.curveStepAfter);
   const areaG = d3.area().x((_, i) => x(i + 30 - n)).y0(h).y1(d => y(d)).curve(d3.curveStepAfter);
-  g.select('#instLine').datum(data).transition().duration(320).attr('d', lineG);
-  g.select('#instArea').datum(data).transition().duration(320).attr('d', areaG);
-  g.select('#instAxisX').call(d3.axisBottom(x).ticks(4).tickFormat(d => `-${29 - d}s`));
-  g.select('#instAxisY').call(d3.axisLeft(y).ticks(max).tickFormat(d => Math.round(d)));
+
+  g.select('#instLine').datum(data).transition().duration(250).attr('d', lineG);
+  g.select('#instArea').datum(data).transition().duration(250).attr('d', areaG);
+
+  g.select('#instAxisX').call(d3.axisBottom(x).ticks(5).tickFormat(d => `-${29 - d}s`)).select('.domain').remove();
+  g.select('#instAxisY').call(d3.axisLeft(y).ticks(max).tickFormat(d => Math.round(d))).select('.domain').remove();
 }
 
 // ─────────────────────────────────────────────────────────
@@ -513,7 +540,7 @@ function initReqChart() {
   const w = W - m.l - m.r, h = H - m.t - m.b;
   const svg = d3.select('#reqChart').append('svg').attr('width', W).attr('height', H);
   const defs = svg.append('defs');
-  
+
   const areaGrad = defs.append('linearGradient').attr('id', 'reqAreaGrad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
   areaGrad.append('stop').attr('offset', '0%').attr('stop-color', C.cyan).attr('stop-opacity', 0.5);
   areaGrad.append('stop').attr('offset', '100%').attr('stop-color', C.cyan).attr('stop-opacity', 0.0);
@@ -524,14 +551,14 @@ function initReqChart() {
 
   const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
   g.append('g').attr('class', 'req-grid-y');
-  
+
   g.append('path').attr('id', 'reqArea').attr('fill', 'url(#reqAreaGrad)');
   g.append('path').attr('id', 'reqLine').attr('fill', 'none').attr('stroke', C.cyan).attr('stroke-width', 3).attr('filter', 'url(#reqGlow)');
-  
+
   g.append('g').attr('class', 'd3-axis').attr('id', 'reqAxisX').attr('transform', `translate(0,${h})`);
   g.append('g').attr('class', 'd3-axis').attr('id', 'reqAxisY');
   g.append('g').attr('id', 'reqDots');
-  
+
   Charts.req = { g, w, h };
 }
 
@@ -539,28 +566,28 @@ function updateReqChart() {
   if (!Charts.req) return;
   const { g, w, h } = Charts.req;
   const data = S.req.slice(-30).map((v, i) => ({ i, v }));
-  
+
   const x = d3.scaleLinear().domain([0, Math.max(1, data.length - 1)]).range([0, w]);
   const maxV = Math.max(d3.max(data, d => d.v) || 10);
   const y = d3.scaleLinear().domain([0, maxV * 1.15]).range([h, 0]);
-  
+
   const lineFunc = d3.line().x(d => x(d.i)).y(d => y(d.v)).curve(d3.curveMonotoneX);
   const areaFunc = d3.area().x(d => x(d.i)).y0(h).y1(d => y(d.v)).curve(d3.curveMonotoneX);
-  
+
   g.select('#reqLine').datum(data).transition().duration(400).ease(d3.easeLinear).attr('d', lineFunc);
   g.select('#reqArea').datum(data).transition().duration(400).ease(d3.easeLinear).attr('d', areaFunc);
-  
+
   const dots = g.select('#reqDots').selectAll('circle').data(data.slice(-1));
   dots.enter().append('circle').attr('r', 5).attr('fill', '#fff').attr('stroke', C.cyan).attr('stroke-width', 2).attr('filter', 'url(#reqGlow)')
-      .merge(dots).transition().duration(400).ease(d3.easeLinear)
-      .attr('cx', d => x(d.i)).attr('cy', d => y(d.v));
-      
+    .merge(dots).transition().duration(400).ease(d3.easeLinear)
+    .attr('cx', d => x(d.i)).attr('cy', d => y(d.v));
+
   g.select('.req-grid-y').call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
   g.select('.req-grid-y').select('.domain').remove();
-  
+
   g.select('#reqAxisX').call(d3.axisBottom(x).ticks(6).tickFormat(d => `-${data.length - 1 - d}s`)).select('.domain').remove();
   g.select('#reqAxisY').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d'))).select('.domain').remove();
-  
+
   if (S.latest) setText('totalReqBadge', `${S.latest.performance.requests} total`);
 }
 
@@ -572,7 +599,7 @@ function initGauge() {
   svg.html('');
   const R = 80, cx = 95, cy = 95, tau = 2 * Math.PI, sAng = -tau * 0.375;
   const defs = svg.append('defs');
-  
+
   const glow = defs.append('filter').attr('id', 'gaugeGlow').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
   glow.append('feGaussianBlur').attr('stdDeviation', '6').attr('result', 'blur');
   glow.append('feComposite').attr('in', 'SourceGraphic').attr('in2', 'blur').attr('operator', 'over');
@@ -597,7 +624,7 @@ function initGauge() {
 
   svg.append('path').attr('id', 'gaugeFg').attr('transform', `translate(${cx},${cy})`);
   svg.append('circle').attr('id', 'gaugeDot').attr('r', 6).attr('cx', cx).attr('cy', cy).attr('fill', '#fff').attr('filter', 'url(#gaugeGlow)');
-  
+
   Charts.gauge = { svg, cx, cy, R, tau, sAng };
 }
 
@@ -607,17 +634,17 @@ function updateGauge(load) {
   const col = load > 75 ? C.danger : load > 50 ? C.warning : C.cyan;
   const pct = Math.min(Math.max(load / 100, 0), 1);
   const endA = sAng + tau * 0.75 * pct;
-  
+
   d3.select('#gaugeFg').datum({ s: sAng, e: endA })
     .transition().duration(500).ease(d3.easeBounceOut)
     .attr('d', d3.arc().innerRadius(R - 20).outerRadius(R - 16).startAngle(d => d.s).endAngle(d => d.e).cornerRadius(4))
     .attr('fill', col).attr('filter', `drop-shadow(0 0 12px ${col}A0)`);
-    
+
   d3.select('#gaugeDot').transition().duration(500).ease(d3.easeBounceOut)
     .attr('cx', cx + Math.sin(endA) * (R - 18))
     .attr('cy', cy - Math.cos(endA) * (R - 18))
     .attr('fill', col);
-    
+
   setText('gaugeNum', Math.round(load));
   const gs = el('gaugeState');
   if (gs) { gs.textContent = load > 75 ? 'CRITICAL' : load > 50 ? 'WARNING' : 'NORMAL'; gs.style.color = col; }
@@ -759,9 +786,66 @@ async function forceScale(direction) {
 // ─────────────────────────────────────────────────────────
 // VIEWS
 // ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// HISTORICAL ANALYTICS ENGINE
+// ─────────────────────────────────────────────────────────
+let histRange = 'live';
+let histData = null;
+let histFetchTimer = null;
+
+function setupHistTabs() {
+  document.querySelectorAll('.hist-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.hist-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      histRange = tab.dataset.range;
+      const liveTag = el('histLiveTag');
+      const srcLabel = el('histSourceLabel');
+      if (histRange === 'live') {
+        if (liveTag) liveTag.style.display = '';
+        if (srcLabel) srcLabel.textContent = 'WebSocket · Live';
+        setText('histChartSub', 'CPU · Memory · Network — last 30s via WebSocket');
+        setText('sDataSource', 'WebSocket');
+        clearInterval(histFetchTimer);
+        renderAnalytics();
+      } else {
+        if (liveTag) liveTag.style.display = 'none';
+        const labels = { '1h': '1 Hour', '6h': '6 Hours', '24h': '24 Hours', '7d': '7 Days' };
+        if (srcLabel) srcLabel.textContent = `MongoDB · ${labels[histRange]}`;
+        setText('histChartSub', `CPU · Memory · Network — last ${labels[histRange]} from database`);
+        setText('sDataSource', 'MongoDB');
+        fetchHistoricalData();
+        // Auto-refresh historical data every 15s
+        clearInterval(histFetchTimer);
+        histFetchTimer = setInterval(fetchHistoricalData, 15000);
+      }
+    });
+  });
+}
+
+async function fetchHistoricalData() {
+  try {
+    const [metricsRes, eventsRes, summaryRes] = await Promise.all([
+      fetch(`/api/metrics/history/detailed?range=${histRange}&limit=300`),
+      fetch(`/api/scaling/events/history?limit=50`),
+      fetch(`/api/analytics/summary`),
+    ]);
+    const metrics = await metricsRes.json();
+    const events = await eventsRes.json();
+    const summary = await summaryRes.json();
+    histData = { metrics: metrics.metrics || [], events: events.events || [], summary };
+    renderHistoricalAnalytics();
+  } catch (e) {
+    console.error('Historical fetch error:', e);
+    toast('⚠️ History Fetch Failed', 'Using cached data', 'warn');
+  }
+}
+
 function renderAnalytics() {
   if (!S.latest) return;
   const d = S.latest, hist = S.cpu.slice(-30);
+
+  // Stats table
   setText('sAvgCpu', hist.length ? (hist.reduce((a, b) => a + b, 0) / hist.length).toFixed(1) + '%' : '--');
   setText('sPeakCpu', hist.length ? Math.max(...hist).toFixed(1) + '%' : '--');
   setText('sMinCpu', hist.length ? Math.min(...hist).toFixed(1) + '%' : '--');
@@ -769,29 +853,406 @@ function renderAnalytics() {
   setText('sReqPerMin', Math.round((d.performance.requests / Math.max(d.system.uptime, 1)) * 60));
   setText('sTotalCost', '₹' + d.cost.total.toFixed(4));
   setText('sInstances', d.scaling.instances);
-  renderMultiChart();
+
+  if (histRange === 'live') {
+    renderLiveHistCharts();
+    updateHistKPIsLive(d, hist);
+    renderHistScaleLog(S.scalingEvents);
+  }
 }
 
-function renderMultiChart() {
-  const wrap = el('analyticsChart'); if (!wrap) return;
+function updateHistKPIsLive(d, hist) {
+  setText('hkAvgCpu', hist.length ? (hist.reduce((a, b) => a + b, 0) / hist.length).toFixed(1) + '%' : '--');
+  setText('hkPeakCpu', hist.length ? Math.max(...hist).toFixed(1) + '%' : '--');
+  const memHist = S.mem.slice(-30);
+  setText('hkAvgMem', memHist.length ? (memHist.reduce((a, b) => a + b, 0) / memHist.length).toFixed(1) + '%' : '--');
+  setText('hkAvgRt', d.performance.responseTime + 'ms');
+  setText('hkTotalCost', '₹' + d.cost.total.toFixed(3));
+  const upEvents = S.scalingEvents.filter(e => e.action === 'scale_up').length;
+  const downEvents = S.scalingEvents.filter(e => e.action === 'scale_down').length;
+  setText('hkScaleEvents', upEvents + downEvents);
+  setText('histScaleUp', '▲ ' + upEvents);
+  setText('histScaleDown', '▼ ' + downEvents);
+  const maxCost = (S.scalingConfig.maxInstances || 5) * 7.05;
+  const actualCost = d.scaling.instances * 7.05;
+  const savings = maxCost > 0 ? ((1 - actualCost / maxCost) * 100).toFixed(0) : 0;
+  setText('hkSavings', savings + '%');
+  setText('hkErrorRate', d.performance.errorRate.toFixed(2) + '%');
+  setText('histCostBadge', '₹' + d.cost.perHour.toFixed(3) + '/hr');
+}
+
+function renderHistoricalAnalytics() {
+  if (!histData) return;
+  const { metrics, events, summary } = histData;
+
+  // Update KPIs from summary
+  setText('hkAvgCpu', summary.avgCpu + '%');
+  setText('hkPeakCpu', summary.peakCpu + '%');
+  setText('hkAvgMem', summary.avgMemory + '%');
+  setText('hkAvgRt', summary.avgResponseTime + 'ms');
+  setText('hkTotalCost', '₹' + summary.totalCost.toFixed(3));
+  setText('hkScaleEvents', summary.scaleUpEvents + summary.scaleDownEvents);
+  setText('histScaleUp', '▲ ' + summary.scaleUpEvents);
+  setText('histScaleDown', '▼ ' + summary.scaleDownEvents);
+  setText('hkSavings', summary.costSavingsPercent + '%');
+  setText('hkErrorRate', summary.errorRate.toFixed(2) + '%');
+  setText('histCostBadge', '₹' + summary.costPerHour.toFixed(3) + '/hr');
+
+  // Stats table
+  setText('sAvgCpu', summary.avgCpu + '%');
+  setText('sPeakCpu', summary.peakCpu + '%');
+  setText('sMinCpu', '--');
+  setText('sTotalReq', summary.totalRequests);
+  setText('sReqPerMin', Math.round((summary.totalRequests / Math.max(summary.uptime, 1)) * 60));
+  setText('sTotalCost', '₹' + summary.totalCost.toFixed(4));
+  setText('sInstances', summary.activeInstances);
+
+  // Render historical charts
+  if (metrics.length > 0) {
+    renderHistResourceChart(metrics);
+    renderHistCostChart(metrics);
+    renderHistScaleChart(metrics);
+    renderHistRtChart(metrics);
+  }
+
+  renderHistScaleLog(events);
+}
+
+// ─────────────────────────────────────────────────────────
+// LIVE MODE CHARTS (WebSocket data)
+// ─────────────────────────────────────────────────────────
+function renderLiveHistCharts() {
+  const n = Math.min(S.cpu.length, S.mem.length, S.net.length, S.rt.length || 1, 30);
+  if (n < 2) return;
+  const cpuD = S.cpu.slice(-n), memD = S.mem.slice(-n), netD = S.net.slice(-n);
+  const rtD = S.rt.slice(-n), instD = S.inst.slice(-n), costD = S.cost.slice(-n);
+
+  // Build metric objects from ACTUAL per-tick history
+  const liveMetrics = cpuD.map((cpu, i) => ({
+    cpuLoad: cpu,
+    memoryUsage: memD[i],
+    networkMbps: netD[i],
+    responseTime: rtD[i] || 100,
+    instances: instD[i] || 1,
+    costPerHour: costD[i] || 7.05,
+    timestamp: new Date(Date.now() - (n - i) * 1000),
+  }));
+
+  renderHistResourceChart(liveMetrics);
+  renderHistCostChart(liveMetrics);
+  renderHistScaleChart(liveMetrics);
+  renderHistRtChart(liveMetrics);
+}
+
+// ─────────────────────────────────────────────────────────
+// D3 — HISTORICAL RESOURCE CHART (CPU + Memory + Network)
+// ─────────────────────────────────────────────────────────
+function renderHistResourceChart(metrics) {
+  const wrap = el('histResourceChart'); if (!wrap) return;
   wrap.innerHTML = '';
-  const m = { t: 12, r: 18, b: 30, l: 40 };
-  const W = Math.max(wrap.clientWidth, 500), H = 240;
+  const m = { t: 18, r: 50, b: 36, l: 44 };
+  const W = Math.max(wrap.clientWidth, 500), H = 260;
   const w = W - m.l - m.r, h = H - m.t - m.b;
-  const n = Math.min(S.cpu.length, S.mem.length, S.disk.length, 30);
-  const cS = S.cpu.slice(-n), mS = S.mem.slice(-n), dS = S.disk.slice(-n);
-  const svg = d3.select('#analyticsChart').append('svg').attr('width', W).attr('height', H);
+
+  const svg = d3.select('#histResourceChart').append('svg').attr('width', W).attr('height', H);
+  const defs = svg.append('defs');
+
+  // CPU gradient
+  const cpuGrad = defs.append('linearGradient').attr('id', 'hrcCpuG').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  cpuGrad.append('stop').attr('offset', '0%').attr('stop-color', C.indigo).attr('stop-opacity', 0.4);
+  cpuGrad.append('stop').attr('offset', '100%').attr('stop-color', C.indigo).attr('stop-opacity', 0.0);
+
+  // Glow filter
+  const glow = defs.append('filter').attr('id', 'hrcGlow').attr('x', '-20%').attr('y', '-20%').attr('width', '140%').attr('height', '140%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'b');
+  glow.append('feComposite').attr('in', 'SourceGraphic').attr('in2', 'b').attr('operator', 'over');
+
   const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
+  const n = metrics.length;
+
   const x = d3.scaleLinear().domain([0, n - 1]).range([0, w]);
   const y = d3.scaleLinear().domain([0, 100]).range([h, 0]);
-  g.append('g').call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  const yNet = d3.scaleLinear().domain([0, d3.max(metrics, d => d.networkMbps || 100) * 1.2 || 200]).range([h, 0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(''))
+    .selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
   g.select('.domain').remove();
-  const line = arr => d3.line().x((_, i) => x(i)).y(d => y(d)).curve(d3.curveCatmullRom)(arr);
-  g.append('path').attr('d', line(cS)).attr('fill', 'none').attr('stroke', C.indigo).attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
-  g.append('path').attr('d', line(mS)).attr('fill', 'none').attr('stroke', C.danger).attr('stroke-width', 2).attr('opacity', 0.8);
-  g.append('path').attr('d', line(dS)).attr('fill', 'none').attr('stroke', C.cyan).attr('stroke-width', 1.8).attr('opacity', 0.7);
-  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(6).tickFormat(d => `-${n - 1 - d}s`));
+
+  // CPU Area
+  const cpuArea = d3.area().x((_, i) => x(i)).y0(h).y1(d => y(d.cpuLoad || 0)).curve(d3.curveCatmullRom);
+  g.append('path').datum(metrics).attr('d', cpuArea).attr('fill', 'url(#hrcCpuG)');
+
+  // CPU Line
+  const cpuLine = d3.line().x((_, i) => x(i)).y(d => y(d.cpuLoad || 0)).curve(d3.curveCatmullRom);
+  g.append('path').datum(metrics).attr('d', cpuLine).attr('fill', 'none')
+    .attr('stroke', C.indigo).attr('stroke-width', 2.5).attr('stroke-linecap', 'round').attr('filter', 'url(#hrcGlow)');
+
+  // Memory Line
+  const memLine = d3.line().x((_, i) => x(i)).y(d => y(d.memoryUsage || 0)).curve(d3.curveCatmullRom);
+  g.append('path').datum(metrics).attr('d', memLine).attr('fill', 'none')
+    .attr('stroke', C.danger).attr('stroke-width', 2).attr('opacity', 0.8);
+
+  // Network Line (secondary Y axis)
+  const netLine = d3.line().x((_, i) => x(i)).y(d => yNet(d.networkMbps || 0)).curve(d3.curveCatmullRom);
+  g.append('path').datum(metrics).attr('d', netLine).attr('fill', 'none')
+    .attr('stroke', C.cyan).attr('stroke-width', 1.8).attr('opacity', 0.7).attr('stroke-dasharray', '4 2');
+
+  // End dots
+  if (n > 0) {
+    const last = metrics[n - 1];
+    g.append('circle').attr('cx', x(n - 1)).attr('cy', y(last.cpuLoad || 0)).attr('r', 5)
+      .attr('fill', '#fff').attr('stroke', C.indigo).attr('stroke-width', 2).attr('filter', 'url(#hrcGlow)');
+    g.append('circle').attr('cx', x(n - 1)).attr('cy', y(last.memoryUsage || 0)).attr('r', 4)
+      .attr('fill', '#fff').attr('stroke', C.danger).attr('stroke-width', 2);
+  }
+
+  // Axes
+  const isLive = histRange === 'live';
+  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(0,${h})`)
+    .call(d3.axisBottom(x).ticks(6).tickFormat(d => {
+      if (isLive) return `-${n - 1 - Math.round(d)}s`;
+      const ts = metrics[Math.min(Math.round(d), n - 1)]?.timestamp;
+      return ts ? new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    }));
   g.append('g').attr('class', 'd3-axis').call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'));
+  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(${w},0)`)
+    .call(d3.axisRight(yNet).ticks(4).tickFormat(d => Math.round(d) + 'Mbps'))
+    .selectAll('text').attr('fill', C.cyan).attr('font-size', '9px');
+
+  // Interactive hover
+  const tip = el('histResourceTooltip');
+  g.append('rect').attr('width', w).attr('height', h).attr('fill', 'none').attr('pointer-events', 'all')
+    .on('mousemove', function (evt) {
+      const [mx] = d3.pointer(evt);
+      const idx = Math.max(0, Math.min(Math.round(x.invert(mx)), n - 1));
+      const pt = metrics[idx];
+      if (tip && pt) {
+        tip.textContent = `CPU: ${(pt.cpuLoad || 0).toFixed(1)}% | Mem: ${(pt.memoryUsage || 0).toFixed(1)}% | Net: ${(pt.networkMbps || 0).toFixed(1)} Mbps`;
+        tip.classList.add('show');
+      }
+    })
+    .on('mouseleave', () => tip?.classList.remove('show'));
+}
+
+// ─────────────────────────────────────────────────────────
+// D3 — COST ANALYTICS CHART
+// ─────────────────────────────────────────────────────────
+function renderHistCostChart(metrics) {
+  const wrap = el('histCostChart'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const m = { t: 14, r: 14, b: 30, l: 44 };
+  const W = Math.max(wrap.clientWidth, 260), H = 200;
+  const w = W - m.l - m.r, h = H - m.t - m.b;
+  const n = metrics.length;
+
+  const svg = d3.select('#histCostChart').append('svg').attr('width', W).attr('height', H);
+  const defs = svg.append('defs');
+  const costGrad = defs.append('linearGradient').attr('id', 'costG').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  costGrad.append('stop').attr('offset', '0%').attr('stop-color', C.success).attr('stop-opacity', 0.35);
+  costGrad.append('stop').attr('offset', '100%').attr('stop-color', C.success).attr('stop-opacity', 0.0);
+
+  const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
+  const costData = metrics.map(m => (m.instances || 1) * 7.05);
+  const x = d3.scaleLinear().domain([0, n - 1]).range([0, w]);
+  const maxC = Math.max(d3.max(costData) || 10, 10);
+  const y = d3.scaleLinear().domain([0, maxC * 1.15]).range([h, 0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(y).ticks(4).tickSize(-w).tickFormat('')).selectAll('line')
+    .attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  g.select('.domain').remove();
+
+  // Area
+  const area = d3.area().x((_, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveMonotoneX);
+  g.append('path').datum(costData).attr('d', area).attr('fill', 'url(#costG)');
+
+  // Line
+  const line = d3.line().x((_, i) => x(i)).y(d => y(d)).curve(d3.curveMonotoneX);
+  g.append('path').datum(costData).attr('d', line).attr('fill', 'none')
+    .attr('stroke', C.success).attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+
+  // End dot
+  if (n > 0) {
+    g.append('circle').attr('cx', x(n - 1)).attr('cy', y(costData[n - 1])).attr('r', 4)
+      .attr('fill', '#fff').attr('stroke', C.success).attr('stroke-width', 2);
+  }
+
+  // Axes
+  const isLive = histRange === 'live';
+  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(0,${h})`)
+    .call(d3.axisBottom(x).ticks(5).tickFormat(d => {
+      if (isLive) return `-${n - 1 - Math.round(d)}s`;
+      const ts = metrics[Math.min(Math.round(d), n - 1)]?.timestamp;
+      return ts ? new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    }));
+  g.append('g').attr('class', 'd3-axis').call(d3.axisLeft(y).ticks(4).tickFormat(d => '₹' + d.toFixed(1)));
+}
+
+// ─────────────────────────────────────────────────────────
+// D3 — SCALING TIMELINE (Instance Count Step Chart)
+// ─────────────────────────────────────────────────────────
+function renderHistScaleChart(metrics) {
+  const wrap = el('histScaleChart'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const m = { t: 12, r: 12, b: 30, l: 38 };
+  const W = Math.max(wrap.clientWidth, 260), H = 200;
+  const w = W - m.l - m.r, h = H - m.t - m.b;
+  const n = metrics.length;
+
+  const svg = d3.select('#histScaleChart').append('svg').attr('width', W).attr('height', H);
+  const defs = svg.append('defs');
+  const scaleGrad = defs.append('linearGradient').attr('id', 'scaleG').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  scaleGrad.append('stop').attr('offset', '0%').attr('stop-color', C.indigo).attr('stop-opacity', 0.25);
+  scaleGrad.append('stop').attr('offset', '100%').attr('stop-color', C.indigo).attr('stop-opacity', 0.0);
+
+  const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
+  const instData = metrics.map(m => m.instances || 1);
+  const maxI = Math.max(d3.max(instData) || 5, 5);
+  const x = d3.scaleLinear().domain([0, n - 1]).range([0, w]);
+  const y = d3.scaleLinear().domain([0, maxI]).range([h, 0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(y).ticks(maxI).tickSize(-w).tickFormat(''))
+    .selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  g.select('.domain').remove();
+
+  // Step Area
+  const area = d3.area().x((_, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveStepAfter);
+  g.append('path').datum(instData).attr('d', area).attr('fill', 'url(#scaleG)');
+
+  // Step Line
+  const line = d3.line().x((_, i) => x(i)).y(d => y(d)).curve(d3.curveStepAfter);
+  g.append('path').datum(instData).attr('d', line).attr('fill', 'none')
+    .attr('stroke', C.indigo).attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+
+  // Change dots — highlight scale events
+  for (let i = 1; i < n; i++) {
+    if (instData[i] !== instData[i - 1]) {
+      const isUp = instData[i] > instData[i - 1];
+      g.append('circle').attr('cx', x(i)).attr('cy', y(instData[i])).attr('r', 5)
+        .attr('fill', isUp ? C.danger : C.success)
+        .attr('stroke', '#fff').attr('stroke-width', 1.5)
+        .attr('opacity', 0.9);
+    }
+  }
+
+  // Axes
+  const isLive = histRange === 'live';
+  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(0,${h})`)
+    .call(d3.axisBottom(x).ticks(5).tickFormat(d => {
+      if (isLive) return `-${n - 1 - Math.round(d)}s`;
+      const ts = metrics[Math.min(Math.round(d), n - 1)]?.timestamp;
+      return ts ? new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    }));
+  g.append('g').attr('class', 'd3-axis').call(d3.axisLeft(y).ticks(maxI).tickFormat(d => Math.round(d)));
+}
+
+// ─────────────────────────────────────────────────────────
+// D3 — RESPONSE TIME TREND WITH P95 BAND
+// ─────────────────────────────────────────────────────────
+function renderHistRtChart(metrics) {
+  const wrap = el('histRtChart'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const m = { t: 14, r: 18, b: 36, l: 48 };
+  const W = Math.max(wrap.clientWidth, 500), H = 200;
+  const w = W - m.l - m.r, h = H - m.t - m.b;
+  const n = metrics.length;
+
+  const svg = d3.select('#histRtChart').append('svg').attr('width', W).attr('height', H);
+  const defs = svg.append('defs');
+  const rtGrad = defs.append('linearGradient').attr('id', 'rtG').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  rtGrad.append('stop').attr('offset', '0%').attr('stop-color', C.warning).attr('stop-opacity', 0.25);
+  rtGrad.append('stop').attr('offset', '100%').attr('stop-color', C.warning).attr('stop-opacity', 0.0);
+
+  const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
+  const rtData = metrics.map(m => m.responseTime || 100);
+  const maxRt = Math.max(d3.max(rtData) || 200, 200);
+  const x = d3.scaleLinear().domain([0, n - 1]).range([0, w]);
+  const y = d3.scaleLinear().domain([0, maxRt * 1.2]).range([h, 0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(''))
+    .selectAll('line').attr('stroke', C.grid).attr('stroke-dasharray', '3 3');
+  g.select('.domain').remove();
+
+  // P95 band (approximate: 1.3x average)
+  const windowSize = Math.max(5, Math.floor(n / 10));
+  const p95Data = rtData.map((v, i) => {
+    const start = Math.max(0, i - windowSize);
+    const window = rtData.slice(start, i + 1);
+    const sorted = [...window].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length * 0.95)] || v * 1.3;
+  });
+  const p5Data = rtData.map((v, i) => {
+    const start = Math.max(0, i - windowSize);
+    const window = rtData.slice(start, i + 1);
+    const sorted = [...window].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length * 0.05)] || v * 0.7;
+  });
+
+  // P95 band area
+  const bandArea = d3.area()
+    .x((_, i) => x(i)).y0((_, i) => y(p5Data[i])).y1((_, i) => y(p95Data[i]))
+    .curve(d3.curveCatmullRom);
+  g.append('path').datum(rtData).attr('d', bandArea)
+    .attr('fill', 'rgba(250, 204, 21, 0.08)').attr('stroke', 'none');
+
+  // RT Area
+  const area = d3.area().x((_, i) => x(i)).y0(h).y1(d => y(d)).curve(d3.curveCatmullRom);
+  g.append('path').datum(rtData).attr('d', area).attr('fill', 'url(#rtG)');
+
+  // RT Line
+  const line = d3.line().x((_, i) => x(i)).y(d => y(d)).curve(d3.curveCatmullRom);
+  g.append('path').datum(rtData).attr('d', line).attr('fill', 'none')
+    .attr('stroke', C.warning).attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+
+  // Threshold line at 500ms (SLA)
+  if (maxRt > 400) {
+    g.append('line').attr('x1', 0).attr('x2', w).attr('y1', y(500)).attr('y2', y(500))
+      .attr('stroke', C.danger).attr('stroke-dasharray', '4 3').attr('opacity', 0.5).attr('stroke-width', 1);
+    g.append('text').attr('x', w - 2).attr('y', y(500) - 4).attr('text-anchor', 'end')
+      .attr('fill', C.danger).attr('font-size', '9').text('SLA 500ms');
+  }
+
+  // End dot
+  if (n > 0) {
+    g.append('circle').attr('cx', x(n - 1)).attr('cy', y(rtData[n - 1])).attr('r', 4)
+      .attr('fill', '#fff').attr('stroke', C.warning).attr('stroke-width', 2);
+  }
+
+  // Axes
+  const isLive = histRange === 'live';
+  g.append('g').attr('class', 'd3-axis').attr('transform', `translate(0,${h})`)
+    .call(d3.axisBottom(x).ticks(6).tickFormat(d => {
+      if (isLive) return `-${n - 1 - Math.round(d)}s`;
+      const ts = metrics[Math.min(Math.round(d), n - 1)]?.timestamp;
+      return ts ? new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    }));
+  g.append('g').attr('class', 'd3-axis').call(d3.axisLeft(y).ticks(5).tickFormat(d => d + 'ms'));
+}
+
+// ─────────────────────────────────────────────────────────
+// SCALING EVENT LOG RENDERER
+// ─────────────────────────────────────────────────────────
+function renderHistScaleLog(events) {
+  const logEl = el('histScaleLog'); if (!logEl) return;
+  if (!events || events.length === 0) {
+    logEl.innerHTML = '<div style="color:var(--t3);padding:20px;text-align:center;font-size:13px;">No scaling events yet</div>';
+    setText('histEventsSub', '0 events recorded');
+    return;
+  }
+  setText('histEventsSub', events.length + ' events recorded');
+  logEl.innerHTML = events.slice(0, 20).map(ev => {
+    const isUp = ev.action === 'scale_up';
+    return `<div class="scale-ev ${isUp ? 'up' : 'down'}">
+      <div class="ev-msg">
+        <div class="ev-comp">${isUp ? '🔺' : '🔻'} ${ev.instancesAfter || '?'} instance${(ev.instancesAfter || 0) !== 1 ? 's' : ''}</div>
+        ${ev.reason || 'Auto-scaling event'}
+      </div>
+      <div class="ev-time">${fmtTime(ev.timestamp)}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderScaling() {
@@ -808,6 +1269,25 @@ function renderScaling() {
       box.className = 'inst-box' + (i < inst ? ' on' : '');
       box.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span>EC2-${String(i + 1).padStart(2, '0')}</span>`;
       grid.appendChild(box);
+    }
+  }
+
+  // Populate Scaling Log
+  const logEl = el('scalingLog');
+  if (logEl) {
+    if (!S.scalingEvents.length) {
+      logEl.innerHTML = '<div style="color:var(--t3);padding:20px;text-align:center;font-size:13px;">No events recorded</div>';
+    } else {
+      logEl.innerHTML = S.scalingEvents.slice(0, 15).map(ev => {
+        const isUp = ev.action === 'scale_up';
+        return `<div class="scale-ev ${isUp ? 'up' : 'down'}">
+          <div class="ev-msg">
+            <div class="ev-comp">${isUp ? '🔺' : '🔻'} ${ev.instancesAfter} instance${ev.instancesAfter !== 1 ? 's' : ''}</div>
+            ${ev.reason || 'Auto-scaling event'}
+          </div>
+          <div class="ev-time">${fmtTime(ev.timestamp)}</div>
+        </div>`;
+      }).join('');
     }
   }
 }
@@ -863,7 +1343,7 @@ function setupNav() {
       setText('pageHeading', h); setText('pageSub', s);
       setTimeout(() => {
         if (view === 'analytics') renderAnalytics();
-        if (view === 'scaling') renderScaling();
+        if (view === 'scaling') { initInstanceChart(); renderScaling(); }
         if (view === 'dashboard') {
           initCpuChart(); updateCpuChart();
           initReqChart(); updateReqChart();
