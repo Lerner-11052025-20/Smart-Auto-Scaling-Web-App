@@ -65,6 +65,8 @@ async function boot() {
   try { initSparklines(); } catch (e) { console.error(e); }
 
   setupResizeObserver();
+  // seed the log summary counts on boot
+  if (typeof updateLogSummary === 'function') updateLogSummary();
 }
 
 function setupResizeObserver() {
@@ -163,7 +165,22 @@ function connectSocket() {
   socket.on('logHistory', ({ logs }) => {
     S.logs = logs;
     if (S.view === 'logs') renderLogs();
+    // update summary counts whenever history arrives
+    updateLogSummary();
   });
+  // Shared handler for incoming single log entries (real-time)
+  function handleIncomingLog(l) {
+    const entry = Object.assign({ level: 'info', message: '', component: 'SYS', timestamp: Date.now() }, l);
+    S.logs.unshift(entry);
+    if (S.logs.length > 500) S.logs.pop();
+    // update UI
+    updateLogSummary();
+    if (S.view === 'logs') renderLogs();
+  }
+
+  socket.on('log', handleIncomingLog);
+  socket.on('logEntry', handleIncomingLog);
+  socket.on('logEvent', handleIncomingLog);
 
   // ── MANUAL SCALE RESULT ──
   socket.on('scaleResult', ({ success, action, instancesAfter }) => {
@@ -280,6 +297,31 @@ function updateKPIs(d) {
   // Cost
   setText('kCost', d.cost.perHour.toFixed(3));
   setText('kCostFooter', `Total: ₹${d.cost.total.toFixed(3)}`);
+
+  // ── PERFORMANCE METRICS (Settings page) ──
+  // WebSocket Connections
+  setText('metricWsConn', d.system.clients || 0);
+  
+  // Active Instances
+  setText('metricInstances', d.scaling.instances || 0);
+  
+  // Total Requests
+  setText('metricReqs', d.performance.requests || 0);
+  
+  // System Uptime (format as HH:MM:SS)
+  const uptimeSecs = d.system.uptime || 0;
+  const h = Math.floor(uptimeSecs / 3600);
+  const m = Math.floor((uptimeSecs % 3600) / 60);
+  const s = uptimeSecs % 60;
+  const uptimeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  setText('metricUptime', uptimeStr);
+  
+  // Avg Response Time (in ms)
+  setText('metricRt', `${Math.round(d.performance.responseTime)}ms`);
+  
+  // Database Latency (simulated from network latency + some offset)
+  const dbLatency = Math.round(d.network.mbps * 0.15 + 5 + Math.random() * 10);
+  setText('metricDbLat', `${dbLatency}ms`);
 
   // Threshold alerts (using scaling config values)
   const UP = S.scalingConfig.scaleUpCpu || 70;
@@ -1306,6 +1348,20 @@ function renderLogs() {
     : `<div style="color:var(--t3);padding:20px;text-align:center;font-size:13px;">No ${S.logFilter} logs.</div>`;
 }
 
+// Update the small Log Summary counts shown in the sidebar
+function updateLogSummary() {
+  const totals = { info: 0, warn: 0, error: 0, success: 0 };
+  for (const l of S.logs) {
+    const lvl = (l.level || 'info').toLowerCase();
+    if (totals.hasOwnProperty(lvl)) totals[lvl]++;
+  }
+  setText('logStatInfo', totals.info);
+  setText('logStatWarn', totals.warn);
+  setText('logStatError', totals.error);
+  setText('logStatSuccess', totals.success);
+  setText('statTotal', S.logs.length || 0);
+}
+
 // ─────────────────────────────────────────────────────────
 // TOAST
 // ─────────────────────────────────────────────────────────
@@ -1339,6 +1395,9 @@ function setupNav() {
       el(`view-${view}`)?.classList.add('active');
       document.querySelectorAll('.nav-link').forEach(x => x.classList.remove('active'));
       a.classList.add('active'); S.view = view;
+      // Hide topbar right controls for logs and settings views only
+      const hideTopControls = view === 'logs' || view === 'settings';
+      document.body.classList.toggle('hide-topbar-right', hideTopControls);
       const [h, s] = PAGE_META[view] || [];
       setText('pageHeading', h); setText('pageSub', s);
       setTimeout(() => {

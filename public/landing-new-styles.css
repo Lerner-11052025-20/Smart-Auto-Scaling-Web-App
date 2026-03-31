@@ -1,0 +1,563 @@
+/* ============================================
+   ADDITIONAL SECTIONS & STYLING FOR REDESIGN
+   ============================================ */
+
+/* STATS SECTION AT TOP OF PAGE */
+.stats-hero {
+    background: linear-gradient(135deg, rgba(11, 18, 32, 0.8), rgba(0, 217, 255, 0.05));
+    padding: 60px 40px;
+    margin-top: 70px;
+    border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.stat-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.stat-number {
+    font-size: 48px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* PROBLEM SECTION REDESIGN */
+.problem {
+    padding: 80px 40px;
+    background: linear-gradient(180deg, rgba(11, 18, 32, 0.5), rgba(0, 102, 255, 0.03));
+    border-bottom: 1px solid rgba(0, 217, 255, 0.08);
+}
+
+.problem h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 60px;
+    color: var(--text-primary);
+}
+
+.problem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.problem-card {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.7), rgba(0, 217, 255, 0.06));
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-radius: 16px;
+    padding: 30px;
+    transition: all var(--transition);
+}
+
+.problem-card:hover {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.9), rgba(0, 217, 255, 0.1));
+    border-color: rgba(0, 217, 255, 0.25);
+    transform: translateY(-5px);
+}
+
+.problem-icon {
+    font-size: 32px;
+    color: var(--accent-cyan);
+    margin-bottom: 15px;
+}
+
+.problem-card h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.problem-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* FEATURES SECTION REDESIGN */
+.features {
+    padding: 80px 40px;
+    background: linear-gradient(135deg, rgba(11, 18, 32, 0.7), rgba(124, 58, 237, 0.03));
+}
+
+.features h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 60px;
+    color: var(--text-primary);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.7), rgba(0, 217, 255, 0.06));
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-radius: 16px;
+    padding: 32px;
+    transition: all var(--transition);
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.feature-card:hover {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.9), rgba(0, 217, 255, 0.1));
+    border-color: rgba(0, 217, 255, 0.25);
+    transform: translateY(-5px);
+}
+
+.feature-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.feature-header i {
+    font-size: 28px;
+    color: var(--accent-cyan);
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 217, 255, 0.1);
+    border-radius: 12px;
+}
+
+.feature-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.feature-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* HOW IT WORKS / STEPS SECTION */
+.how-it-works {
+    padding: 80px 40px;
+    background: linear-gradient(180deg, rgba(11, 18, 32, 0.5), rgba(0, 217, 255, 0.02));
+}
+
+.how-it-works h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 60px;
+    color: var(--text-primary);
+}
+
+.steps-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.step-card {
+    flex: 1;
+    min-width: 250px;
+    max-width: 320px;
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.8), rgba(0, 217, 255, 0.08));
+    border: 1px solid rgba(0, 217, 255, 0.15);
+    border-radius: 16px;
+    padding: 30px;
+    text-align: center;
+    transition: all var(--transition);
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.step-card:hover {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.95), rgba(0, 217, 255, 0.12));
+    border-color: rgba(0, 217, 255, 0.3);
+    transform: translateY(-5px);
+}
+
+.step-number {
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--accent-blue);
+    margin-bottom: 15px;
+}
+
+.step-card h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.step-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.step-icon {
+    font-size: 32px;
+    color: var(--accent-cyan);
+}
+
+.step-arrow {
+    font-size: 28px;
+    color: var(--accent-cyan);
+    animation: float 3s ease-in-out infinite;
+}
+
+/* DEMO SECTION */
+.demo {
+    padding: 80px 40px;
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.08), rgba(0, 102, 255, 0.04));
+    border: 1px solid rgba(0, 217, 255, 0.15);
+    border-radius: 20px;
+    margin: 60px 40px;
+    max-width: 1300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.demo-content {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.demo h2 {
+    font-size: clamp(28px, 5vw, 40px);
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.demo p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+    line-height: 1.7;
+}
+
+/* TESTIMONIALS SECTION */
+.testimonials {
+    padding: 80px 40px;
+    background: linear-gradient(180deg, rgba(11, 18, 32, 0.7), rgba(124, 58, 237, 0.02));
+}
+
+.testimonials h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 60px;
+    color: var(--text-primary);
+}
+
+.testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto 80px;
+}
+
+.testimonial-card {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.8), rgba(0, 217, 255, 0.08));
+    border: 1px solid rgba(0, 217, 255, 0.15);
+    border-radius: 16px;
+    padding: 32px;
+    transition: all var(--transition);
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.testimonial-card:hover {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.95), rgba(0, 217, 255, 0.12));
+    border-color: rgba(0, 217, 255, 0.3);
+    transform: translateY(-5px);
+}
+
+.stars {
+    color: #facc15;
+    font-size: 16px;
+    margin-bottom: 16px;
+    letter-spacing: 4px;
+}
+
+.testimonial-card p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 20px;
+    font-style: italic;
+}
+
+.testimonial-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-small {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 50%;
+}
+
+.author {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.role {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* METRICS ROW*/
+.metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-top: 60px;
+    border-top: 1px solid rgba(0, 217, 255, 0.1);
+}
+
+.metric-box {
+    text-align: center;
+    padding: 30px 20px;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.metric-box .metric-value {
+    font-size: 36px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.metric-box .metric-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.metric-suffix {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+/* TRUST SECTION */
+.trust {
+    padding: 80px 40px;
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.05), rgba(0, 102, 255, 0.02));
+    border-top: 1px solid rgba(0, 217, 255, 0.08);
+}
+
+.trust h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 40px);
+    margin-bottom: 40px;
+    color: var(--text-primary);
+}
+
+.trust-content {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.trust-content p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 40px;
+    line-height: 1.7;
+}
+
+.trust-badges {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.trust-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    background: rgba(0, 217, 255, 0.06);
+    border: 1px solid rgba(0, 217, 255, 0.15);
+    border-radius: 12px;
+    transition: all var(--transition);
+}
+
+.trust-badge:hover {
+    background: rgba(0, 217, 255, 0.1);
+    border-color: rgba(0, 217, 255, 0.3);
+    transform: translateY(-3px);
+}
+
+.trust-badge i {
+    font-size: 28px;
+    color: var(--accent-cyan);
+}
+
+.trust-badge span {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+/* BENEFITS/TRANSFORM SECTION */
+.benefits {
+    padding: 80px 40px;
+    background: linear-gradient(180deg, rgba(11, 18, 32, 0.5), rgba(124, 58, 237, 0.02));
+}
+
+.benefits h2 {
+    text-align: center;
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 60px;
+    color: var(--text-primary);
+}
+
+.benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.benefit-card {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.7), rgba(0, 217, 255, 0.06));
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    transition: all var(--transition);
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.benefit-card:hover {
+    background: linear-gradient(135deg, rgba(26, 35, 50, 0.9), rgba(0, 217, 255, 0.1));
+    border-color: rgba(0, 217, 255, 0.25);
+    transform: translateY(-5px);
+}
+
+.benefit-icon {
+    font-size: 36px;
+    color: var(--accent-cyan);
+    margin-bottom: 16px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid rgba(0, 217, 255, 0.2);
+    border-radius: 12px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.benefit-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.benefit-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .steps-container {
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .step-arrow {
+        transform: rotate(90deg);
+        margin: 10px 0;
+    }
+
+    .demo {
+        margin: 40px 20px;
+        padding: 40px 20px;
+    }
+
+    .trust-badges {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .problem,
+    .features,
+    .how-it-works,
+    .testimonials,
+    .trust,
+    .benefits {
+        padding: 60px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid,
+    .trust-badges {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-number {
+        font-size: 36px;
+    }
+
+    .step-card {
+        min-width: 100%;
+    }
+}
