@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bCurrent = document.getElementById('b-current');
     const bFee = document.getElementById('b-fee');
     const bNew = document.getElementById('b-new');
+    const co2Val = document.getElementById('co2-val');
 
     if (spendInput) {
         spendInput.addEventListener('input', (e) => {
@@ -151,6 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const savings = val * 0.65;
             const fee = val * 0.02;
             const newTotal = val - savings + fee;
+            
+            // CO2 math approx: 1kg per $1300 savings
+            const co2 = (savings / 1300).toFixed(1);
 
             spendVal.innerText = formatted;
             bCurrent.innerText = formatted;
@@ -158,6 +162,10 @@ document.addEventListener('DOMContentLoaded', () => {
             savingsVal.innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(savings);
             bFee.innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(fee);
             bNew.innerText = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(newTotal);
+            
+            if (co2Val) {
+                co2Val.innerText = `Prevent ~${co2} kg of CO₂ emissions monthly`;
+            }
         });
     }
 
