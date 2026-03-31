@@ -100,10 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 5. FAQ Accordion Logic (High Performance Toggle)
-    const faqItems = document.querySelectorAll('.faq-item');
+    const faqItems = document.querySelectorAll('.faq-luxe-item');
     faqItems.forEach(item => {
-        const questionbtn = item.querySelector('.faq-question');
-        questionbtn.addEventListener('click', () => {
+        const header = item.querySelector('.faq-luxe-header');
+        header.addEventListener('click', () => {
             const isActive = item.classList.contains('active');
             
             // Close all other items for a cleaner UI
@@ -214,20 +214,112 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 10. Before/After Slider Logic
-    const baSlider = document.getElementById('ba-slider');
-    if (baSlider) {
-        baSlider.addEventListener('input', (e) => {
-            const sliderPos = e.target.value;
-            const baBefore = document.querySelector('.ba-before');
-            const baLine = document.getElementById('ba-line');
-            const baBtn = document.getElementById('ba-btn');
+    // 10. Hologram Simulation Demo Logic
+    const htLegacy = document.getElementById('ht-legacy');
+    const htAi = document.getElementById('ht-ai');
+    const holoTrigger = document.getElementById('holo-trigger');
+    const tFill = document.getElementById('traffic-fill');
+    const hAlert = document.getElementById('holo-alert');
+    const aiNodes = document.querySelectorAll('.ai-node');
+    const baseNodes = document.querySelectorAll('.base-node');
+
+    if (htLegacy && htAi && holoTrigger) {
+        let currentSimMode = 'legacy';
+        let isSimRunning = false;
+
+        const resetSim = () => {
+            tFill.style.width = '15%';
+            tFill.style.background = 'var(--accent-secondary)';
+            hAlert.innerText = 'SYSTEM STABLE';
+            hAlert.style.color = '#3b82f6';
+            document.querySelector('.holo-display').classList.remove('spike-warning');
             
-            // Adjust the clip path. e.g. at 50%, right inset is 50%
-            baBefore.style.clipPath = `inset(0 ${100 - sliderPos}% 0 0)`;
-            baLine.style.left = `${sliderPos}%`;
-            baBtn.style.left = `${sliderPos}%`;
+            baseNodes.forEach(node => node.classList.remove('spike-crash', 'shake'));
+            aiNodes.forEach(node => node.classList.remove('node-spawn'));
+        };
+
+        htLegacy.addEventListener('click', () => {
+            if(isSimRunning) return;
+            htLegacy.classList.add('active');
+            htAi.classList.remove('active');
+            currentSimMode = 'legacy';
+            resetSim();
         });
+
+        htAi.addEventListener('click', () => {
+            if(isSimRunning) return;
+            htAi.classList.add('active');
+            htLegacy.classList.remove('active');
+            currentSimMode = 'ai';
+            resetSim();
+        });
+
+        holoTrigger.addEventListener('click', () => {
+            if (isSimRunning) return;
+            isSimRunning = true;
+            holoTrigger.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Simulating...';
+            holoTrigger.style.pointerEvents = 'none';
+
+            resetSim();
+
+            // 1. Initial Traffic Pulse
+            setTimeout(() => {
+                tFill.style.width = '45%';
+            }, 300);
+
+            // 2. Traffic Spike Arrives
+            setTimeout(() => {
+                tFill.style.width = '100%';
+                document.querySelector('.holo-display').classList.add('spike-warning');
+                
+                if (currentSimMode === 'legacy') {
+                    // Legacy crashes immediately
+                    setTimeout(() => {
+                        hAlert.innerText = '100% CPU - SYSTEM OVERLOAD';
+                        hAlert.style.color = '#ef4444';
+                        baseNodes.forEach(node => node.classList.add('shake', 'spike-crash'));
+                        
+                        setTimeout(finalizeSim, 2000);
+                    }, 500);
+
+                } else {
+                    // AI triggers predictive scale just before the peak crashes it
+                    setTimeout(() => {
+                        hAlert.innerText = 'PREDICTIVE SCALE ENGAGED';
+                        hAlert.style.color = '#10b981';
+                        
+                        // Spawn nodes one by one
+                        aiNodes.forEach((node, index) => {
+                            setTimeout(() => {
+                                node.classList.add('node-spawn');
+                            }, index * 150);
+                        });
+
+                        // Nodes boot up and absorb load
+                        setTimeout(() => {
+                            document.querySelector('.holo-display').classList.remove('spike-warning');
+                            tFill.style.background = '#10b981'; // Green stable
+                            tFill.style.width = '35%'; // Load distributed
+                            hAlert.innerText = 'TRAFFIC DISTRIBUTED - STABLE';
+                            
+                            setTimeout(finalizeSim, 2000);
+                        }, 800);
+                        
+                    }, 200);
+                }
+            }, 1000);
+        });
+
+        function finalizeSim() {
+            isSimRunning = false;
+            holoTrigger.innerHTML = '<i class="fa-solid fa-bolt text-gradient"></i> Send Traffic';
+            holoTrigger.style.pointerEvents = 'auto';
+            
+            // Revert nicely after delay
+            setTimeout(() => {
+                if(!isSimRunning) resetSim();
+            }, 4000);
+        }
     }
 
     // Performance: Only run heavy logic if page is visible
